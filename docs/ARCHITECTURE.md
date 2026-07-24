@@ -14,10 +14,10 @@ Every integration is optional. The CLI and receipt format remain useful without 
 ## Execution flow
 
 1. Load and strictly validate a revisioned project manifest.
-2. Start exactly one declared local process or use one declared HTTP target.
-3. Wait for a loopback readiness endpoint when running locally.
-4. Create an isolated browser context per viewport.
-5. Visit each declared route and collect browser events.
+2. Start exactly one declared local process or use one declared HTTP origin.
+3. Wait for a same-origin loopback readiness path when running locally.
+4. Create a fresh isolated browser context for each route and viewport case.
+5. Visit the declared same-origin route and collect browser events.
 6. Capture immutable evidence and content digests.
 7. Evaluate diagnostics against explicit failure policy.
 8. Stop the local process and write one receipt.
@@ -30,8 +30,11 @@ The initial worker is single-operator and trusted-code only. Renderprove does no
 - Ambient environment inheritance is intentionally narrow.
 - Project output stays beneath a validated output root.
 - Local targets use loopback addresses.
-- Browser contexts are isolated by viewport and discarded after review.
+- Route and readiness paths cannot switch to another origin.
+- Browser contexts are isolated per review case and discarded immediately.
 - Fork pull requests must not automatically reach personal self-hosted workers.
+
+The initial lexical path checks assume trusted repository contents. Symlink-hostile workspaces require a stronger sandbox boundary such as a SmolRunner-managed container.
 
 ## Adapter direction
 
