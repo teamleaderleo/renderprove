@@ -41,7 +41,7 @@ test('requires exactly one target mode', () => {
 test('rejects unknown fields, shell commands, embedded credentials, and escaping cwd', () => {
   assert.throws(() => normalizeManifest({ ...deployed, surprise: true }), /unknown fields/);
   assert.throws(() => normalizeManifest({ ...deployed, target: undefined, runtime: { command: 'npm run dev', port: 4173 } }), /string array/);
-  assert.throws(() => normalizeManifest({ ...deployed, target: { baseUrl: 'https://user:secret@example.com' } }), /HTTP or HTTPS URL/);
+  assert.throws(() => normalizeManifest({ ...deployed, target: { baseUrl: 'https://user:secret@example.com' } }), /HTTP or HTTPS origin/);
   assert.throws(() => normalizeManifest({
     ...deployed,
     target: undefined,
