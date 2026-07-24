@@ -1,4 +1,5 @@
 {
+  "$schema": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/manifest-v1.schema.json",
   "version": 1,
   "project": "deployed-app",
   "target": {
