@@ -2,8 +2,7 @@ import path from 'node:path';
 import { inspectProject, reviewProject } from './service.mjs';
 import { summarizeReceipt } from './core/receipt.mjs';
 import { RenderproveError } from './core/errors.mjs';
-
-const VERSION = '0.1.0';
+import { VERSION } from './version.mjs';
 
 function write(stream, value) {
   stream.write(`${value}\n`);
