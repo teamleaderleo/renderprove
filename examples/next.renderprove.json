@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "project": "my-next-app",
+  "runtime": {
+    "command": ["npm", "run", "dev", "--", "--hostname", "127.0.0.1", "--port", "4173"],
+    "port": 4173,
+    "readyPath": "/"
+  },
+  "review": {
+    "routes": ["/", "/settings"],
+    "viewports": ["desktop", "mobile"]
+  }
+}
