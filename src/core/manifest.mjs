@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { RenderproveError } from './errors.mjs';
+import { isOutsideRoot } from './paths.mjs';
 
 export const DEFAULT_MANIFEST_NAMES = ['renderprove.json', '.renderprove.json'];
 
@@ -69,8 +70,7 @@ function normalizeRuntime(runtime, projectRoot) {
     throw new RenderproveError('runtime.cwd must be a non-empty string.', { code: 'INVALID_MANIFEST' });
   }
   const runtimeCwd = path.resolve(projectRoot, runtime.cwd ?? '.');
-  const cwdRelative = path.relative(path.resolve(projectRoot), runtimeCwd);
-  if (cwdRelative.startsWith('..') || path.isAbsolute(cwdRelative)) {
+  if (isOutsideRoot(projectRoot, runtimeCwd)) {
     throw new RenderproveError('runtime.cwd must stay inside the project root.', { code: 'INVALID_MANIFEST' });
   }
   const readyPath = runtime.readyPath ?? '/';
@@ -202,8 +202,7 @@ export function normalizeManifest(input, { projectRoot = process.cwd(), sourcePa
 export async function findManifest(projectRoot, explicitPath) {
   if (explicitPath) {
     const sourcePath = path.resolve(projectRoot, explicitPath);
-    const relative = path.relative(path.resolve(projectRoot), sourcePath);
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    if (isOutsideRoot(projectRoot, sourcePath)) {
       throw new RenderproveError('Manifest path must stay inside the project root.', { code: 'UNSAFE_MANIFEST_PATH' });
     }
     return sourcePath;
