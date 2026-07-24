@@ -19,7 +19,10 @@ async function waitForReady(url, { timeoutMs, signal, processExited }) {
       throw new RenderproveError('Preview process exited before it became ready.', { code: 'RUNTIME_EXITED' });
     }
     try {
-      const response = await fetch(url, { redirect: 'manual', signal });
+      const remainingMs = Math.max(1, deadline - Date.now());
+      const timeoutSignal = AbortSignal.timeout(Math.min(1_000, remainingMs));
+      const attemptSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+      const response = await fetch(url, { redirect: 'manual', signal: attemptSignal });
       if (response.status >= 200 && response.status < 400) return response.status;
       lastError = new Error(`HTTP ${response.status}`);
     } catch (error) {
@@ -45,13 +48,13 @@ export async function startRuntime(manifest, { signal } = {}) {
 
   const [program, ...args] = runtime.command;
   const cwd = path.resolve(manifest.projectRoot, runtime.cwd);
+  const inheritedEnv = Object.fromEntries(
+    ['PATH', 'HOME', 'TMPDIR', 'CI'].flatMap((key) => typeof process.env[key] === 'string' ? [[key, process.env[key]]] : []),
+  );
   const child = spawn(program, args, {
     cwd,
     env: {
-      PATH: process.env.PATH,
-      HOME: process.env.HOME,
-      TMPDIR: process.env.TMPDIR,
-      CI: process.env.CI,
+      ...inheritedEnv,
       ...runtime.env,
       PORT: String(runtime.port),
       HOST: '127.0.0.1',
@@ -90,8 +93,7 @@ export async function startRuntime(manifest, { signal } = {}) {
     details: {
       mode: 'local',
       command: runtime.command,
-      cwd,
-      pid: child.pid,
+      cwd: runtime.cwd,
     },
     logs: () => ({ stdout, stderr, exit }),
     stop: async () => terminate(child, runtime.shutdownMs),
@@ -100,6 +102,7 @@ export async function startRuntime(manifest, { signal } = {}) {
 
 async function terminate(child, shutdownMs) {
   if (child.exitCode !== null || child.signalCode !== null) return;
+  if (!Number.isInteger(child.pid)) return;
   try {
     if (process.platform === 'win32') child.kill('SIGTERM');
     else process.kill(-child.pid, 'SIGTERM');
@@ -117,5 +120,9 @@ async function terminate(child, shutdownMs) {
     } catch (error) {
       if (error?.code !== 'ESRCH') throw error;
     }
+    await Promise.race([
+      once(child, 'exit').catch(() => {}),
+      new Promise((resolve) => setTimeout(resolve, 1_000)),
+    ]);
   }
 }
