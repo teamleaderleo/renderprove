@@ -11,12 +11,15 @@ const files = new Set(pack.files.map((file) => file.path));
 const required = [
   'LICENSE',
   'README.md',
+  'SECURITY.md',
   'package.json',
   'bin/renderprove.mjs',
   'src/index.mjs',
   'src/version.mjs',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
+  'docs/ARCHITECTURE.md',
+  'docs/RECEIPT_V1.md',
 ];
 for (const file of required) {
   if (!files.has(file)) throw new Error(`npm package is missing ${file}`);
