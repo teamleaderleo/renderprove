@@ -10,6 +10,7 @@ const VIEWPORT_PRESETS = Object.freeze({
   mobile: { name: 'mobile', width: 390, height: 844, deviceScaleFactor: 1 },
   tablet: { name: 'tablet', width: 820, height: 1180, deviceScaleFactor: 1 },
 });
+const SENTINEL_ORIGIN = 'https://renderprove.invalid';
 
 function assertObject(value, label) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -38,14 +39,31 @@ function normalizePositiveInteger(value, fallback, label, { min = 1, max = Numbe
   return candidate;
 }
 
-function normalizeUrl(value, label) {
+function normalizeOrigin(value, label) {
   try {
     const url = new URL(value);
     if (!['http:', 'https:'].includes(url.protocol)) throw new Error('unsupported protocol');
     if (url.username || url.password) throw new Error('embedded credentials are unsupported');
-    return url.toString().replace(/\/$/, '');
+    if (url.pathname !== '/' || url.search || url.hash) throw new Error('origin must not include a path, query, or fragment');
+    return url.origin;
   } catch (cause) {
-    throw new RenderproveError(`${label} must be an HTTP or HTTPS URL.`, {
+    throw new RenderproveError(`${label} must be an HTTP or HTTPS origin without credentials, path, query, or fragment.`, {
+      code: 'INVALID_MANIFEST',
+      cause,
+    });
+  }
+}
+
+function normalizeSameOriginPath(value, label) {
+  if (typeof value !== 'string' || !value.startsWith('/')) {
+    throw new RenderproveError(`${label} must start with /.`, { code: 'INVALID_MANIFEST' });
+  }
+  try {
+    const url = new URL(value, `${SENTINEL_ORIGIN}/`);
+    if (url.origin !== SENTINEL_ORIGIN) throw new Error('path changes origin');
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch (cause) {
+    throw new RenderproveError(`${label} must stay on the declared origin.`, {
       code: 'INVALID_MANIFEST',
       cause,
     });
@@ -73,16 +91,12 @@ function normalizeRuntime(runtime, projectRoot) {
   if (isOutsideRoot(projectRoot, runtimeCwd)) {
     throw new RenderproveError('runtime.cwd must stay inside the project root.', { code: 'INVALID_MANIFEST' });
   }
-  const readyPath = runtime.readyPath ?? '/';
-  if (typeof readyPath !== 'string' || !readyPath.startsWith('/')) {
-    throw new RenderproveError('runtime.readyPath must start with /.', { code: 'INVALID_MANIFEST' });
-  }
   return {
     command: [...runtime.command],
     cwd: runtime.cwd ?? '.',
     env: { ...env },
     port: normalizePositiveInteger(runtime.port, undefined, 'runtime.port', { min: 1024, max: 65535 }),
-    readyPath,
+    readyPath: normalizeSameOriginPath(runtime.readyPath ?? '/', 'runtime.readyPath'),
     timeoutMs: normalizePositiveInteger(runtime.timeoutMs, 30_000, 'runtime.timeoutMs', { min: 1_000, max: 300_000 }),
     shutdownMs: normalizePositiveInteger(runtime.shutdownMs, 5_000, 'runtime.shutdownMs', { min: 100, max: 60_000 }),
   };
@@ -113,15 +127,13 @@ function normalizeViewport(viewport, index) {
 function normalizeRoute(route, index) {
   const value = typeof route === 'string' ? { path: route } : assertObject(route, `review.routes[${index}]`);
   assertKnownKeys(value, ['path', 'name', 'waitForMs', 'fullPage'], `review.routes[${index}]`);
-  if (typeof value.path !== 'string' || !value.path.startsWith('/')) {
-    throw new RenderproveError(`review.routes[${index}].path must start with /.`, { code: 'INVALID_MANIFEST' });
-  }
   if (typeof value.fullPage !== 'undefined' && typeof value.fullPage !== 'boolean') {
     throw new RenderproveError(`review.routes[${index}].fullPage must be a boolean.`, { code: 'INVALID_MANIFEST' });
   }
+  const routePath = normalizeSameOriginPath(value.path, `review.routes[${index}].path`);
   return {
-    path: value.path,
-    name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : value.path,
+    path: routePath,
+    name: typeof value.name === 'string' && value.name.trim() ? value.name.trim() : routePath,
     waitForMs: normalizePositiveInteger(value.waitForMs, 250, `review.routes[${index}].waitForMs`, { min: 0, max: 30_000 }),
     fullPage: value.fullPage ?? true,
   };
@@ -194,7 +206,7 @@ export function normalizeManifest(input, { projectRoot = process.cwd(), sourcePa
     projectRoot: resolvedProjectRoot,
     sourcePath,
     runtime,
-    target: target ? { baseUrl: normalizeUrl(target.baseUrl, 'target.baseUrl') } : null,
+    target: target ? { baseUrl: normalizeOrigin(target.baseUrl, 'target.baseUrl') } : null,
     review: normalizeReview(input.review),
   });
 }
