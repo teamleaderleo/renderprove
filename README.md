@@ -57,6 +57,8 @@ To inspect an existing deployment instead, replace `runtime` with:
 }
 ```
 
+`target.baseUrl` is an origin, without a path, query, fragment, or embedded credentials. Route and readiness paths stay on that origin, and a main-frame redirect to another origin fails the review before a screenshot is captured.
+
 ## Evidence
 
 Each route and viewport produces:
@@ -73,13 +75,13 @@ Receipts are written to `.renderprove/receipt.json` by default. Absolute worker 
 
 Included now:
 
-- local and deployed-URL review modes
+- local and deployed-origin review modes
 - shell-free process startup and bounded logs
 - desktop, mobile, tablet, and custom viewports
 - collision-resistant artifact names and safe output paths
-- strict versioned JSON manifests
+- strict versioned JSON manifests and receipts
 - Playwright Chromium receipts
-- core and full browser CI
+- locked core, package, executable, and browser CI
 
 Planned after this contract proves useful:
 
