@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/receipt-v1.schema.json",
+  "title": "Renderprove receipt v1",
+  "type": "object",
+  "required": ["version", "project", "target", "startedAt", "finishedAt", "durationMs", "status", "summary", "runtime", "cases"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "properties": { "manifest": { "type": ["string", "null"] } }
+    },
+    "target": {
+      "type": "object",
+      "required": ["baseUrl"],
+      "properties": { "baseUrl": { "type": "string", "format": "uri" } }
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": { "type": "string", "format": "date-time" },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "status": { "enum": ["passed", "failed"] },
+    "summary": {
+      "type": "object",
+      "required": ["cases", "passed", "failed", "diagnostics"],
+      "properties": {
+        "cases": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "diagnostics": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "runtime": { "type": "object" },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "route", "viewport", "navigation", "artifacts", "diagnostics"],
+        "properties": {
+          "id": { "type": "string" },
+          "status": { "enum": ["passed", "failed"] },
+          "artifacts": { "type": "array" },
+          "diagnostics": { "type": "array" }
+        }
+      }
+    }
+  }
+}
