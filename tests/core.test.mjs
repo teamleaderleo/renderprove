@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { normalizeManifest } from '../src/core/manifest.mjs';
+import { normalizeManifest, findManifest } from '../src/core/manifest.mjs';
 import { safeSegment, resolveInside } from '../src/core/paths.mjs';
 import { createReceipt, summarizeReceipt } from '../src/core/receipt.mjs';
 import { caseStatus, shouldFail } from '../src/browser/diagnostics.mjs';
@@ -49,6 +49,11 @@ test('rejects unknown fields, shell commands, embedded credentials, and escaping
   }, { projectRoot: '/tmp/project' }), /inside the project root/);
 });
 
+test('rejects duplicate routes and viewport names', () => {
+  assert.throws(() => normalizeManifest({ ...deployed, review: { routes: ['/', '/'] } }), /duplicate path/);
+  assert.throws(() => normalizeManifest({ ...deployed, review: { routes: ['/'], viewports: ['mobile', 'mobile'] } }), /duplicate name/);
+});
+
 test('accepts named custom viewports and explicit route settings', () => {
   const manifest = normalizeManifest({
     ...deployed,
@@ -68,7 +73,11 @@ test('creates stable artifact-safe paths', () => {
   assert.throws(() => resolveInside('/tmp/output', '..', 'secret'), /escapes/);
 });
 
-test('summarizes passing and failing receipt cases', () => {
+test('keeps explicit manifests inside the project root', async () => {
+  await assert.rejects(() => findManifest('/tmp/project', '../secret.json'), /inside the project root/);
+});
+
+test('summarizes receipt cases without absolute worker paths', () => {
   const manifest = { project: 'demo', projectRoot: '/demo', sourcePath: '/demo/renderprove.json' };
   const receipt = createReceipt({
     manifest,
@@ -83,6 +92,8 @@ test('summarizes passing and failing receipt cases', () => {
   });
   assert.equal(receipt.status, 'failed');
   assert.deepEqual(receipt.summary, { cases: 2, passed: 1, failed: 1, diagnostics: 1 });
+  assert.equal(receipt.source.manifest, 'renderprove.json');
+  assert.equal('projectRoot' in receipt.source, false);
   assert.match(summarizeReceipt(receipt), /1\/2/);
 });
 
@@ -103,6 +114,16 @@ test('parses project and review CLI options', () => {
     json: true,
   });
   assert.throws(() => parseArgs(['review', '--wat']), /Unknown option/);
+});
+
+test('handles missing runtime executables without invalid process cleanup', async () => {
+  const manifest = normalizeManifest({
+    version: 1,
+    project: 'missing-runtime',
+    runtime: { command: ['definitely-missing-renderprove-command'], port: 43128, timeoutMs: 1_000 },
+    review: { routes: ['/'] },
+  });
+  await assert.rejects(() => startRuntime(manifest), /exited before it became ready/);
 });
 
 test('starts a loopback runtime and observes readiness', async () => {
