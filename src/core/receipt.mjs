@@ -1,4 +1,6 @@
-export const RECEIPT_SCHEMA = 'https://renderprove.com/schemas/receipt-v1.json';
+import path from 'node:path';
+
+export const RECEIPT_SCHEMA = 'https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/receipt-v1.schema.json';
 
 export function createReceipt({ manifest, startedAt, finishedAt, baseUrl, cases, runtime }) {
   const failedCases = cases.filter((item) => item.status === 'failed').length;
@@ -8,8 +10,7 @@ export function createReceipt({ manifest, startedAt, finishedAt, baseUrl, cases,
     version: 1,
     project: manifest.project,
     source: {
-      manifest: manifest.sourcePath,
-      projectRoot: manifest.projectRoot,
+      manifest: manifest.sourcePath ? path.relative(manifest.projectRoot, manifest.sourcePath) : null,
     },
     target: { baseUrl },
     startedAt,
