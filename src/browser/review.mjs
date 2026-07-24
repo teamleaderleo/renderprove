@@ -17,6 +17,14 @@ function pushDiagnostic(diagnostics, diagnostic) {
   diagnostics.push({ at: new Date().toISOString(), ...diagnostic });
 }
 
+export function isSameOrigin(baseUrl, candidateUrl) {
+  try {
+    return new URL(baseUrl).origin === new URL(candidateUrl).origin;
+  } catch {
+    return false;
+  }
+}
+
 export async function runBrowserReview(manifest, { baseUrl, outputRoot, headed = false, chromium: chromiumOverride } = {}) {
   let chromium = chromiumOverride;
   if (!chromium) {
@@ -94,6 +102,11 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       timeout: manifest.review.navigationTimeoutMs,
     });
     if (!response?.ok()) fatalFailure = true;
+    if (!isSameOrigin(baseUrl, page.url())) {
+      throw new RenderproveError(`Main-frame navigation left the declared origin: ${page.url()}`, {
+        code: 'CROSS_ORIGIN_NAVIGATION',
+      });
+    }
     if (route.waitForMs > 0) await page.waitForTimeout(route.waitForMs);
 
     const routeDigest = shortDigest(route.path);
