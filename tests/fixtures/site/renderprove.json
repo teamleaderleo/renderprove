@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "project": "renderprove-fixture",
+  "runtime": {
+    "command": ["node", "server.mjs"],
+    "port": 4173,
+    "readyPath": "/health"
+  },
+  "review": {
+    "routes": ["/"],
+    "viewports": ["desktop", "mobile"],
+    "outputDir": ".proof"
+  }
+}
