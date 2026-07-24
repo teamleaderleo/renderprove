@@ -3,19 +3,24 @@
   "version": "0.1.0",
   "description": "Browser evidence for software projects and coding agents.",
   "type": "module",
+  "sideEffects": false,
   "bin": { "renderprove": "./bin/renderprove.mjs" },
   "exports": {
     ".": "./src/index.mjs",
     "./manifest": "./src/core/manifest.mjs",
-    "./receipt": "./src/core/receipt.mjs"
+    "./receipt": "./src/core/receipt.mjs",
+    "./version": "./src/version.mjs",
+    "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
+    "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json"
   },
-  "files": ["bin", "src", "README.md", "LICENSE"],
+  "files": ["bin", "src", "schema", "README.md", "LICENSE"],
   "engines": { "node": ">=22" },
   "scripts": {
     "check": "node scripts/validate-project.mjs",
+    "check:package": "node scripts/validate-package.mjs",
     "test": "node --test",
     "test:browser": "node tests/browser-smoke.mjs",
-    "ci": "npm run check && npm test"
+    "ci": "npm run check && npm run check:package && npm test"
   },
   "dependencies": { "playwright": "1.56.1" },
   "keywords": ["playwright", "visual-testing", "browser-automation", "mcp", "coding-agents"],
