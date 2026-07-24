@@ -16,7 +16,7 @@ export async function reviewProject({ projectRoot = process.cwd(), manifestPath,
   const startedAt = new Date().toISOString();
   const runtime = await startRuntime(manifest, { signal });
   let cases;
-  let runtimeLogs = null;
+  let runtimeLogSummary = null;
   try {
     cases = await runBrowserReview(manifest, {
       baseUrl: runtime.baseUrl,
@@ -26,7 +26,12 @@ export async function reviewProject({ projectRoot = process.cwd(), manifestPath,
     });
   } finally {
     await runtime.stop();
-    runtimeLogs = runtime.logs?.() ?? null;
+    const logs = runtime.logs?.() ?? null;
+    runtimeLogSummary = logs ? {
+      stdoutBytes: Buffer.byteLength(logs.stdout),
+      stderrBytes: Buffer.byteLength(logs.stderr),
+      exit: logs.exit,
+    } : null;
   }
   const finishedAt = new Date().toISOString();
   const receipt = createReceipt({
@@ -35,7 +40,7 @@ export async function reviewProject({ projectRoot = process.cwd(), manifestPath,
     finishedAt,
     baseUrl: runtime.baseUrl,
     cases,
-    runtime: { ...runtime.details, logs: runtimeLogs },
+    runtime: { ...runtime.details, logs: runtimeLogSummary },
   });
   await fs.mkdir(outputRoot, { recursive: true });
   const receiptPath = path.join(outputRoot, 'receipt.json');
