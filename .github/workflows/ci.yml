@@ -23,7 +23,14 @@ jobs:
       - run: npm ci --ignore-scripts
       - run: npm run check
       - run: npm run check:package
-      - run: npm test
+      - run: mkdir -p test-results && node --test --test-reporter=spec 2>&1 | tee test-results/core.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderprove-core-results
+          path: test-results/core.txt
+          if-no-files-found: error
+          retention-days: 7
 
   browser:
     runs-on: ubuntu-latest
