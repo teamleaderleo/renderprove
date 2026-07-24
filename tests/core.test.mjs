@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { normalizeManifest, findManifest } from '../src/core/manifest.mjs';
-import { safeSegment, resolveInside } from '../src/core/paths.mjs';
+import { safeSegment, resolveInside, isOutsideRoot } from '../src/core/paths.mjs';
 import { createReceipt, summarizeReceipt } from '../src/core/receipt.mjs';
 import { caseStatus, shouldFail } from '../src/browser/diagnostics.mjs';
 import { parseArgs } from '../src/cli.mjs';
@@ -70,10 +70,14 @@ test('creates stable artifact-safe paths', () => {
   assert.equal(safeSegment('Mobile / Sign in'), 'mobile-sign-in');
   assert.equal(safeSegment('../../'), 'artifact');
   assert.match(resolveInside('/tmp/output', 'screenshots', 'home.png'), /output.*screenshots.*home\.png$/);
+  assert.equal(resolveInside('/tmp/output', '..proof', 'home.png'), path.resolve('/tmp/output/..proof/home.png'));
+  assert.equal(isOutsideRoot('/tmp/output', '/tmp/output/..proof'), false);
+  assert.equal(isOutsideRoot('/tmp/output', '/tmp/secret'), true);
   assert.throws(() => resolveInside('/tmp/output', '..', 'secret'), /escapes/);
 });
 
 test('keeps explicit manifests inside the project root', async () => {
+  assert.equal(await findManifest('/tmp/project', '..config.json'), path.resolve('/tmp/project/..config.json'));
   await assert.rejects(() => findManifest('/tmp/project', '../secret.json'), /inside the project root/);
 });
 
