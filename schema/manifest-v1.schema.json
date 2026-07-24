@@ -8,7 +8,7 @@
   "properties": {
     "$schema": { "type": "string" },
     "version": { "const": 1 },
-    "project": { "type": "string", "minLength": 1 },
+    "project": { "type": "string", "minLength": 1, "pattern": "\\S" },
     "runtime": {
       "type": "object",
       "additionalProperties": false,
@@ -22,7 +22,7 @@
           "additionalProperties": { "type": "string" }
         },
         "port": { "type": "integer", "minimum": 1024, "maximum": 65535 },
-        "readyPath": { "type": "string", "pattern": "^/" },
+        "readyPath": { "type": "string", "pattern": "^/(?![/\\\\])" },
         "timeoutMs": { "type": "integer", "minimum": 1000, "maximum": 300000 },
         "shutdownMs": { "type": "integer", "minimum": 100, "maximum": 60000 }
       }
@@ -31,7 +31,7 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["baseUrl"],
-      "properties": { "baseUrl": { "type": "string", "format": "uri", "pattern": "^https?://" } }
+      "properties": { "baseUrl": { "type": "string", "format": "uri", "pattern": "^https?://[^/?#]+/?$" } }
     },
     "review": {
       "type": "object",
@@ -43,14 +43,14 @@
           "minItems": 1,
           "items": {
             "oneOf": [
-              { "type": "string", "pattern": "^/" },
+              { "type": "string", "pattern": "^/(?![/\\\\])" },
               {
                 "type": "object",
                 "additionalProperties": false,
                 "required": ["path"],
                 "properties": {
-                  "path": { "type": "string", "pattern": "^/" },
-                  "name": { "type": "string", "minLength": 1 },
+                  "path": { "type": "string", "pattern": "^/(?![/\\\\])" },
+                  "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
                   "waitForMs": { "type": "integer", "minimum": 0, "maximum": 30000 },
                   "fullPage": { "type": "boolean" }
                 }
@@ -69,7 +69,7 @@
                 "additionalProperties": false,
                 "required": ["name", "width", "height"],
                 "properties": {
-                  "name": { "type": "string", "minLength": 1 },
+                  "name": { "type": "string", "minLength": 1, "pattern": "\\S" },
                   "width": { "type": "integer", "minimum": 240, "maximum": 7680 },
                   "height": { "type": "integer", "minimum": 240, "maximum": 7680 },
                   "deviceScaleFactor": { "type": "integer", "minimum": 1, "maximum": 3 }
@@ -88,7 +88,7 @@
             "httpError": { "type": "boolean" }
           }
         },
-        "outputDir": { "type": "string", "minLength": 1 },
+        "outputDir": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "navigationTimeoutMs": { "type": "integer", "minimum": 1000, "maximum": 300000 }
       }
     }
