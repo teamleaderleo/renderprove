@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "project": "deployed-app",
+  "target": {
+    "baseUrl": "https://example.com"
+  },
+  "review": {
+    "routes": ["/"],
+    "viewports": ["desktop", "mobile"]
+  }
+}
