@@ -5,6 +5,10 @@ import { safeSegment, resolveInside } from '../core/paths.mjs';
 import { RenderproveError } from '../core/errors.mjs';
 import { caseStatus } from './diagnostics.mjs';
 
+function shortDigest(value) {
+  return createHash('sha256').update(value).digest('hex').slice(0, 10);
+}
+
 async function fileDigest(filePath) {
   return createHash('sha256').update(await fs.readFile(filePath)).digest('hex');
 }
@@ -55,6 +59,8 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
   const diagnostics = [];
   const startedAt = new Date().toISOString();
   const requestedUrl = new URL(route.path, `${baseUrl}/`).toString();
+  let fatalFailure = false;
+  let result;
 
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -87,9 +93,11 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       waitUntil: 'load',
       timeout: manifest.review.navigationTimeoutMs,
     });
+    if (!response?.ok()) fatalFailure = true;
     if (route.waitForMs > 0) await page.waitForTimeout(route.waitForMs);
 
-    const artifactName = `${safeSegment(viewport.name)}--${safeSegment(route.name, 'root')}.png`;
+    const routeDigest = shortDigest(route.path);
+    const artifactName = `${safeSegment(viewport.name)}--${safeSegment(route.name, 'root')}--${routeDigest}.png`;
     const screenshotPath = resolveInside(outputRoot, 'screenshots', artifactName);
     await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
     await page.screenshot({ path: screenshotPath, fullPage: route.fullPage });
@@ -104,14 +112,13 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       clientHeight: document.documentElement.clientHeight,
     }));
 
-    return {
+    result = {
       id: `${viewport.name}:${route.path}`,
-      status: caseStatus(diagnostics, manifest.review.failOn),
       startedAt,
       finishedAt: new Date().toISOString(),
       route: { name: route.name, path: route.path, requestedUrl, finalUrl: page.url() },
       viewport,
-      navigation: { status: response?.status() ?? null, ok: response?.ok() ?? null },
+      navigation: { status: response?.status() ?? null, ok: response?.ok() ?? false },
       page: pageFacts,
       artifacts: [{
         kind: 'screenshot',
@@ -122,10 +129,10 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       diagnostics,
     };
   } catch (error) {
+    fatalFailure = true;
     pushDiagnostic(diagnostics, { kind: 'page', message: error.message, stack: error.stack });
-    return {
+    result = {
       id: `${viewport.name}:${route.path}`,
-      status: 'failed',
       startedAt,
       finishedAt: new Date().toISOString(),
       route: { name: route.name, path: route.path, requestedUrl, finalUrl: page.url() },
@@ -138,4 +145,8 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
   } finally {
     await page.close();
   }
+
+  result.finishedAt = new Date().toISOString();
+  result.status = fatalFailure ? 'failed' : caseStatus(diagnostics, manifest.review.failOn);
+  return result;
 }
