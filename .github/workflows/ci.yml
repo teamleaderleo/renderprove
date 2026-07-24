@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: npm run check
+      - run: npm run check:package
+      - run: mkdir -p test-results && node --test --test-reporter=spec 2>&1 | tee test-results/core.txt
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderprove-core-results
+          path: test-results/core.txt
+          if-no-files-found: error
+          retention-days: 7
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - run: npm ci --ignore-scripts
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderprove-browser-receipt
+          path: tests/fixtures/site/.proof
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: true

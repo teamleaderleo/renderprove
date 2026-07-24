@@ -1,0 +1,160 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/receipt-v1.schema.json",
+  "title": "Renderprove receipt v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "version", "project", "source", "target", "startedAt", "finishedAt", "durationMs", "status", "summary", "runtime", "cases"],
+  "properties": {
+    "$schema": { "const": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/receipt-v1.schema.json" },
+    "version": { "const": 1 },
+    "project": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifest"],
+      "properties": { "manifest": { "type": ["string", "null"] } }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["baseUrl"],
+      "properties": { "baseUrl": { "type": "string", "format": "uri", "pattern": "^https?://" } }
+    },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "finishedAt": { "type": "string", "format": "date-time" },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "status": { "enum": ["passed", "failed"] },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cases", "passed", "failed", "diagnostics"],
+      "properties": {
+        "cases": { "type": "integer", "minimum": 0 },
+        "passed": { "type": "integer", "minimum": 0 },
+        "failed": { "type": "integer", "minimum": 0 },
+        "diagnostics": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "runtime": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": { "mode": { "const": "remote" }, "logs": { "type": "null" } }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode", "command", "cwd", "logs"],
+          "properties": {
+            "mode": { "const": "local" },
+            "command": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+            "cwd": { "type": "string" },
+            "logs": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["stdoutBytes", "stderrBytes", "exit"],
+              "properties": {
+                "stdoutBytes": { "type": "integer", "minimum": 0 },
+                "stderrBytes": { "type": "integer", "minimum": 0 },
+                "exit": { "type": ["object", "null"] }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "status", "startedAt", "finishedAt", "route", "viewport", "navigation", "page", "artifacts", "diagnostics"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["passed", "failed"] },
+          "startedAt": { "type": "string", "format": "date-time" },
+          "finishedAt": { "type": "string", "format": "date-time" },
+          "route": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "path", "requestedUrl", "finalUrl"],
+            "properties": {
+              "name": { "type": "string" },
+              "path": { "type": "string", "pattern": "^/" },
+              "requestedUrl": { "type": "string", "format": "uri" },
+              "finalUrl": { "type": "string" }
+            }
+          },
+          "viewport": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "width", "height", "deviceScaleFactor"],
+            "properties": {
+              "name": { "type": "string" },
+              "width": { "type": "integer", "minimum": 240 },
+              "height": { "type": "integer", "minimum": 240 },
+              "deviceScaleFactor": { "type": "integer", "minimum": 1 }
+            }
+          },
+          "navigation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["status", "ok"],
+            "properties": {
+              "status": { "type": ["integer", "null"] },
+              "ok": { "type": "boolean" }
+            }
+          },
+          "page": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["title", "lang", "bodyTextLength", "scrollWidth", "clientWidth", "scrollHeight", "clientHeight"],
+                "properties": {
+                  "title": { "type": "string" },
+                  "lang": { "type": ["string", "null"] },
+                  "bodyTextLength": { "type": "integer", "minimum": 0 },
+                  "scrollWidth": { "type": "integer", "minimum": 0 },
+                  "clientWidth": { "type": "integer", "minimum": 0 },
+                  "scrollHeight": { "type": "integer", "minimum": 0 },
+                  "clientHeight": { "type": "integer", "minimum": 0 }
+                }
+              }
+            ]
+          },
+          "artifacts": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["kind", "path", "mimeType", "sha256"],
+              "properties": {
+                "kind": { "const": "screenshot" },
+                "path": { "type": "string", "minLength": 1 },
+                "mimeType": { "const": "image/png" },
+                "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+              }
+            }
+          },
+          "diagnostics": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["at", "kind", "message"],
+              "properties": {
+                "at": { "type": "string", "format": "date-time" },
+                "kind": { "enum": ["console", "page", "request", "http"] },
+                "message": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

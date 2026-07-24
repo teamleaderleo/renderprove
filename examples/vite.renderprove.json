@@ -1,0 +1,14 @@
+{
+  "$schema": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/manifest-v1.schema.json",
+  "version": 1,
+  "project": "my-vite-app",
+  "runtime": {
+    "command": ["npm", "run", "dev", "--", "--host", "127.0.0.1", "--port", "4173"],
+    "port": 4173,
+    "readyPath": "/"
+  },
+  "review": {
+    "routes": ["/", "/about"],
+    "viewports": ["desktop", "mobile"]
+  }
+}
