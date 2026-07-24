@@ -32,6 +32,7 @@ Renderprove reads `renderprove.json` or `.renderprove.json` from the project roo
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/manifest-v1.schema.json",
   "version": 1,
   "project": "my-vite-app",
   "runtime": {
@@ -66,7 +67,7 @@ Each route and viewport produces:
 - console errors, uncaught page errors, failed requests, and HTTP error responses
 - an explicit pass or fail result based on manifest policy
 
-Receipts are written to `.renderprove/receipt.json` by default. See [receipt v1](docs/RECEIPT_V1.md).
+Receipts are written to `.renderprove/receipt.json` by default. Absolute worker paths and successful-process log contents are excluded from receipts. See [receipt v1](docs/RECEIPT_V1.md).
 
 ## Current boundary
 
@@ -75,7 +76,7 @@ Included now:
 - local and deployed-URL review modes
 - shell-free process startup and bounded logs
 - desktop, mobile, tablet, and custom viewports
-- deterministic artifact names and safe output paths
+- collision-resistant artifact names and safe output paths
 - strict versioned JSON manifests
 - Playwright Chromium receipts
 - core and full browser CI
