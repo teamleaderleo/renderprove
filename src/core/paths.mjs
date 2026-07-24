@@ -12,11 +12,15 @@ export function safeSegment(value, fallback = 'artifact') {
   return normalized || fallback;
 }
 
+export function isOutsideRoot(root, candidate) {
+  const relative = path.relative(path.resolve(root), path.resolve(candidate));
+  return relative === '..' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative);
+}
+
 export function resolveInside(root, ...segments) {
   const absoluteRoot = path.resolve(root);
   const candidate = path.resolve(absoluteRoot, ...segments);
-  const relative = path.relative(absoluteRoot, candidate);
-  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (isOutsideRoot(absoluteRoot, candidate)) {
     throw new RenderproveError('Artifact path escapes the output directory.', {
       code: 'UNSAFE_ARTIFACT_PATH',
       details: { root: absoluteRoot, candidate },
