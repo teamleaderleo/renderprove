@@ -35,17 +35,17 @@ export async function runBrowserReview(manifest, { baseUrl, outputRoot, headed =
   const cases = [];
   try {
     for (const viewport of manifest.review.viewports) {
-      const context = await browser.newContext({
-        viewport: { width: viewport.width, height: viewport.height },
-        deviceScaleFactor: viewport.deviceScaleFactor,
-        reducedMotion: 'reduce',
-      });
-      try {
-        for (const route of manifest.review.routes) {
+      for (const route of manifest.review.routes) {
+        const context = await browser.newContext({
+          viewport: { width: viewport.width, height: viewport.height },
+          deviceScaleFactor: viewport.deviceScaleFactor,
+          reducedMotion: 'reduce',
+        });
+        try {
           cases.push(await reviewCase({ manifest, context, baseUrl, outputRoot, viewport, route }));
+        } finally {
+          await context.close();
         }
-      } finally {
-        await context.close();
       }
     }
   } finally {
@@ -143,7 +143,12 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       diagnostics,
     };
   } finally {
-    await page.close();
+    try {
+      await page.close();
+    } catch (error) {
+      fatalFailure = true;
+      pushDiagnostic(diagnostics, { kind: 'page', message: `Unable to close page: ${error.message}` });
+    }
   }
 
   result.finishedAt = new Date().toISOString();
