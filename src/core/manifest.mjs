@@ -148,9 +148,19 @@ function normalizeReview(review) {
   if (typeof review.outputDir !== 'undefined' && (typeof review.outputDir !== 'string' || review.outputDir.trim().length === 0)) {
     throw new RenderproveError('review.outputDir must be a non-empty string.', { code: 'INVALID_MANIFEST' });
   }
+  const routes = review.routes.map(normalizeRoute);
+  const normalizedViewports = viewports.map(normalizeViewport);
+  const duplicateRoute = routes.find((route, index) => routes.findIndex((candidate) => candidate.path === route.path) !== index);
+  if (duplicateRoute) {
+    throw new RenderproveError(`review.routes contains duplicate path ${duplicateRoute.path}.`, { code: 'INVALID_MANIFEST' });
+  }
+  const duplicateViewport = normalizedViewports.find((viewport, index) => normalizedViewports.findIndex((candidate) => candidate.name === viewport.name) !== index);
+  if (duplicateViewport) {
+    throw new RenderproveError(`review.viewports contains duplicate name ${duplicateViewport.name}.`, { code: 'INVALID_MANIFEST' });
+  }
   return {
-    routes: review.routes.map(normalizeRoute),
-    viewports: viewports.map(normalizeViewport),
+    routes,
+    viewports: normalizedViewports,
     failOn: {
       consoleError: failOn.consoleError ?? true,
       pageError: failOn.pageError ?? true,
@@ -164,7 +174,7 @@ function normalizeReview(review) {
 
 export function normalizeManifest(input, { projectRoot = process.cwd(), sourcePath = null } = {}) {
   assertObject(input, 'manifest');
-  assertKnownKeys(input, ['version', 'project', 'runtime', 'target', 'review'], 'manifest');
+  assertKnownKeys(input, ['$schema', 'version', 'project', 'runtime', 'target', 'review'], 'manifest');
   if (input.version !== 1) {
     throw new RenderproveError('manifest.version must be 1.', { code: 'UNSUPPORTED_MANIFEST_VERSION' });
   }
@@ -190,7 +200,14 @@ export function normalizeManifest(input, { projectRoot = process.cwd(), sourcePa
 }
 
 export async function findManifest(projectRoot, explicitPath) {
-  if (explicitPath) return path.resolve(projectRoot, explicitPath);
+  if (explicitPath) {
+    const sourcePath = path.resolve(projectRoot, explicitPath);
+    const relative = path.relative(path.resolve(projectRoot), sourcePath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new RenderproveError('Manifest path must stay inside the project root.', { code: 'UNSAFE_MANIFEST_PATH' });
+    }
+    return sourcePath;
+  }
   for (const name of DEFAULT_MANIFEST_NAMES) {
     const candidate = path.resolve(projectRoot, name);
     try {
