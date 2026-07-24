@@ -1,0 +1,26 @@
+{
+  "name": "renderprove",
+  "version": "0.1.0",
+  "description": "Browser evidence for software projects and coding agents.",
+  "type": "module",
+  "bin": { "renderprove": "./bin/renderprove.mjs" },
+  "exports": {
+    ".": "./src/index.mjs",
+    "./manifest": "./src/core/manifest.mjs",
+    "./receipt": "./src/core/receipt.mjs"
+  },
+  "files": ["bin", "src", "README.md", "LICENSE"],
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check": "node scripts/validate-project.mjs",
+    "test": "node --test",
+    "test:browser": "node tests/browser-smoke.mjs",
+    "ci": "npm run check && npm test"
+  },
+  "dependencies": { "playwright": "1.56.1" },
+  "keywords": ["playwright", "visual-testing", "browser-automation", "mcp", "coding-agents"],
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "git+https://github.com/teamleaderleo/renderprove.git" },
+  "bugs": { "url": "https://github.com/teamleaderleo/renderprove/issues" },
+  "homepage": "https://github.com/teamleaderleo/renderprove#readme"
+}
