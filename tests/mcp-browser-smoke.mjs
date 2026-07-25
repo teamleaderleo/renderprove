@@ -31,7 +31,7 @@ try {
     },
     { timeout: 120_000 },
   );
-  assert.equal(result.isError, undefined);
+  assert.notEqual(result.isError, true);
   const payload = parseToolPayload(result);
   assert.equal(payload.ok, true);
   assert.equal(payload.value.status, 'passed');
