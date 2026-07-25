@@ -115,7 +115,7 @@ test('MCP review paths reject symlinked runtime and output escapes', async () =>
   }
 });
 
-test('MCP responses omit commands, environments, logs, and absolute roots', () => {
+test('MCP responses omit commands, environments, logs, stacks, and absolute roots', () => {
   const manifest = {
     version: 1,
     project: 'demo',
@@ -155,10 +155,15 @@ test('MCP responses omit commands, environments, logs, and absolute roots', () =
       command: ['npm', 'run', 'dev'],
       logs: { stdout: 'secret output' },
     },
-    cases: [],
+    cases: [{
+      id: 'desktop:/',
+      diagnostics: [{ kind: 'page', message: 'boom', stack: '/private/worker/demo/app.js:1' }],
+    }],
   }, 'demo');
   assert.deepEqual(receipt.runtime, { mode: 'local' });
   assert.equal(receipt.source.projectPath, 'demo');
+  assert.deepEqual(receipt.cases[0].diagnostics, [{ kind: 'page', message: 'boom' }]);
+  assert.equal(JSON.stringify(receipt).includes('/private/worker'), false);
 
   const failure = parseToolPayload(toolFailure(new RenderproveError('/private/worker/demo failed', {
     code: 'UNKNOWN_PRIVATE_FAILURE',
@@ -182,7 +187,7 @@ test('stdio MCP lists bounded tools and inspects an enrolled project', { timeout
       name: 'inspect_project',
       arguments: { project: 'site' },
     });
-    assert.equal(inspected.isError, undefined);
+    assert.notEqual(inspected.isError, true);
     const payload = parseToolPayload(inspected);
     assert.equal(payload.ok, true);
     assert.equal(payload.value.project, 'renderprove-fixture');
