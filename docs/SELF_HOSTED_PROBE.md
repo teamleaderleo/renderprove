@@ -44,7 +44,7 @@ tests/fixtures/site/.renderprove-probe/
   worker.json
   review.stdout.json
   receipt.json
-  *.png
+  screenshots/
 ```
 
 To review another project already prepared inside the Renderprove checkout:
@@ -54,6 +54,49 @@ bash scripts/probe-podman.sh path/to/project
 ```
 
 The project must contain `renderprove.json` or `.renderprove.json`. Its runtime command must work with the dependencies already present in that project directory. Dependency installation and production builds remain repository-owned preparation steps.
+
+`RENDERPROVE_PROBE_OUTPUT` selects another project-relative evidence directory. `RENDERPROVE_PROBE_BUILD=0` reuses the previously built image. Both settings are validated before execution.
+
+## Prove repeated convergence
+
+```bash
+npm run probe:repeatability
+```
+
+The repeatability probe builds the worker once, launches five fresh identity containers and five fresh review containers, then writes:
+
+```text
+tests/fixtures/site/.renderprove-repeatability/
+  repeatability.json
+  runs/
+    001/
+      worker.json
+      review.stdout.json
+      receipt.json
+      screenshots/
+    002/
+    ...
+```
+
+`repeatability.json` records:
+
+- each run name and receipt status;
+- a canonical SHA-256 fingerprint of every worker identity;
+- the union of case IDs observed across all runs;
+- each case status and screenshot digest per run;
+- missing cases or screenshots;
+- stable and drifting case counts;
+- one overall pass or fail result.
+
+The command exits with `1` when any receipt fails, renderer fingerprints differ, a case is absent, a screenshot is missing, or screenshot digests differ. Invalid inputs and unreadable evidence exit with `2`.
+
+Override the run count for a focused check:
+
+```bash
+RENDERPROVE_REPEAT_RUNS=3 npm run probe:repeatability
+```
+
+The accepted range is two through twenty. The default stays at five for the proving matrix.
 
 ## Worker identity
 
@@ -84,10 +127,11 @@ Increasing the Lima guest to 8 GiB is recommended before reviewing a production 
 - one app process and renderer in one container;
 - Chromium only;
 - no dependency installation after outbound networking is disabled;
-- no baseline comparison;
+- screenshot equality is byte-exact, with no perceptual tolerance;
+- no baseline approval or replacement;
 - no authentication injection;
 - no secret scanning or screenshot masking;
 - no automatic GitHub runner registration;
 - no SmolRunner mutation path.
 
-The next slices should prove repeated screenshot convergence, then add exact worker provenance to a new receipt version, app preparation identity, and baseline comparison.
+The next slices should bind exact worker provenance into receipt v2, enrol a separately prepared application, then add baseline and perceptual-difference evidence.

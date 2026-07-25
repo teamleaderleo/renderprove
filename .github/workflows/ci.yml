@@ -66,48 +66,61 @@ jobs:
             --file build/worker/Containerfile \
             --tag renderprove-worker:test \
             .
-      - name: Record worker identity
+      - name: Repeat fixture in fresh workers
         run: |
-          mkdir -p test-results/worker
+          root="tests/fixtures/site/.worker-repeatability"
+          rm -rf "${root}"
+          mkdir -p "${root}/runs"
           image_id="$(docker image inspect --format '{{.Id}}' renderprove-worker:test)"
-          docker run --rm --init --ipc=host --network=none \
-            --user "$(id -u):$(id -g)" \
-            --cap-drop=ALL --security-opt no-new-privileges \
-            --pids-limit=768 --memory=2g --cpus=2 \
-            --tmpfs /tmp:rw,nosuid,nodev,size=1g \
-            --entrypoint node \
-            --env RENDERPROVE_WORKER_IMAGE=renderprove-worker:test \
-            --env "RENDERPROVE_WORKER_IMAGE_ID=${image_id}" \
-            renderprove-worker:test \
-            /opt/renderprove/scripts/worker-identity.mjs \
-            > test-results/worker/worker.json
-          node -e "const value=require('./test-results/worker/worker.json'); if (value.version !== 1 || value.browser?.name !== 'chromium' || !value.fonts?.sha256) process.exit(1)"
-      - name: Review fixture in worker
-        run: |
-          rm -rf tests/fixtures/site/.worker-proof
+
+          for run in 001 002 003; do
+            run_root="${root}/runs/${run}"
+            mkdir -p "${run_root}"
+
+            docker run --rm --init --ipc=host --network=none \
+              --user "$(id -u):$(id -g)" \
+              --cap-drop=ALL --security-opt no-new-privileges \
+              --pids-limit=768 --memory=2g --cpus=2 \
+              --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+              --entrypoint node \
+              --env RENDERPROVE_WORKER_IMAGE=renderprove-worker:test \
+              --env "RENDERPROVE_WORKER_IMAGE_ID=${image_id}" \
+              renderprove-worker:test \
+              /opt/renderprove/scripts/worker-identity.mjs \
+              > "${run_root}/worker.json"
+
+            node -e "const value=require('./' + process.argv[1]); if (value.version !== 1 || value.browser?.name !== 'chromium' || !value.fonts?.sha256) process.exit(1)" "${run_root}/worker.json"
+
+            set +e
+            docker run --rm --init --ipc=host --network=none \
+              --user "$(id -u):$(id -g)" \
+              --cap-drop=ALL --security-opt no-new-privileges \
+              --pids-limit=768 --memory=2g --cpus=2 \
+              --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+              --volume "${GITHUB_WORKSPACE}/tests/fixtures/site:/workspace/project:rw" \
+              renderprove-worker:test \
+              review /workspace/project --output ".worker-repeatability/runs/${run}" --json \
+              > "${run_root}/review.stdout.json" \
+              2> "${run_root}/review.stderr.txt"
+            status=$?
+            set -e
+            cat "${run_root}/review.stderr.txt"
+            if [ "${status}" -ne 0 ]; then exit "${status}"; fi
+            node -e "const value=require('./' + process.argv[1]); if (value.status !== 'passed' || value.cases?.length !== 2) process.exit(1)" "${run_root}/receipt.json"
+          done
+
           set +e
-          docker run --rm --init --ipc=host --network=none \
-            --user "$(id -u):$(id -g)" \
-            --cap-drop=ALL --security-opt no-new-privileges \
-            --pids-limit=768 --memory=2g --cpus=2 \
-            --tmpfs /tmp:rw,nosuid,nodev,size=1g \
-            --volume "${GITHUB_WORKSPACE}/tests/fixtures/site:/workspace/project:rw" \
-            renderprove-worker:test \
-            review /workspace/project --output .worker-proof --json \
-            > test-results/worker/review.stdout.json \
-            2> test-results/worker/review.stderr.txt
+          node scripts/repeatability-report.mjs "${root}" > "${root}/repeatability.json.tmp"
           status=$?
           set -e
-          cat test-results/worker/review.stderr.txt
-          if [ "${status}" -ne 0 ]; then exit "${status}"; fi
-          node -e "const value=require('./tests/fixtures/site/.worker-proof/receipt.json'); if (value.status !== 'passed' || value.cases?.length !== 2) process.exit(1)"
+          mv "${root}/repeatability.json.tmp" "${root}/repeatability.json"
+          cat "${root}/repeatability.json"
+          exit "${status}"
       - if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: renderprove-worker-probe
-          path: |
-            test-results/worker
-            tests/fixtures/site/.worker-proof
+          name: renderprove-worker-repeatability
+          path: tests/fixtures/site/.worker-repeatability
           if-no-files-found: error
           retention-days: 7
           include-hidden-files: true
