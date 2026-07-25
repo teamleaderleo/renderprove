@@ -9,8 +9,12 @@ ENV CI=1 \
 
 WORKDIR /opt/renderprove
 
-COPY package.json package-lock.json ./
-RUN npm ci --ignore-scripts
+COPY package*.json ./
+RUN if [ -f package-lock.json ]; then \
+      npm ci --ignore-scripts; \
+    else \
+      npm install --ignore-scripts; \
+    fi
 
 COPY bin ./bin
 COPY src ./src
