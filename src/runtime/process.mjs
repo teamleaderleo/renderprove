@@ -10,11 +10,19 @@ function appendBounded(current, chunk) {
   return combined.length <= MAX_LOG_BYTES ? combined : combined.slice(-MAX_LOG_BYTES);
 }
 
+function cancellationError(signal) {
+  if (signal?.reason instanceof RenderproveError) return signal.reason;
+  return new RenderproveError('Review was cancelled while starting the project runtime.', {
+    code: 'REVIEW_CANCELLED',
+    cause: signal?.reason instanceof Error ? signal.reason : undefined,
+  });
+}
+
 async function waitForReady(url, { timeoutMs, signal, processExited }) {
   const deadline = Date.now() + timeoutMs;
   let lastError;
   while (Date.now() < deadline) {
-    if (signal?.aborted) throw signal.reason;
+    if (signal?.aborted) throw cancellationError(signal);
     if (processExited()) {
       throw new RenderproveError('Preview process exited before it became ready.', { code: 'RUNTIME_EXITED' });
     }
@@ -26,6 +34,7 @@ async function waitForReady(url, { timeoutMs, signal, processExited }) {
       if (response.status >= 200 && response.status < 400) return response.status;
       lastError = new Error(`HTTP ${response.status}`);
     } catch (error) {
+      if (signal?.aborted) throw cancellationError(signal);
       lastError = error;
     }
     await new Promise((resolve) => setTimeout(resolve, 150));
@@ -46,6 +55,7 @@ export async function startRuntime(manifest, { signal } = {}) {
     };
   }
 
+  if (signal?.aborted) throw cancellationError(signal);
   const [program, ...args] = runtime.command;
   const cwd = path.resolve(manifest.projectRoot, runtime.cwd);
   const inheritedEnv = Object.fromEntries(
@@ -81,6 +91,7 @@ export async function startRuntime(manifest, { signal } = {}) {
     });
   } catch (error) {
     await terminate(child, runtime.shutdownMs);
+    if (signal?.aborted || error?.code === 'REVIEW_CANCELLED') throw cancellationError(signal);
     throw new RenderproveError(error.message, {
       code: error.code ?? 'RUNTIME_START_FAILED',
       cause: error,
