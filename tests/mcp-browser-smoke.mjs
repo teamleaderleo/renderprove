@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { CallToolResultSchema } from '@modelcontextprotocol/sdk/types.js';
 
 const repoRoot = path.dirname(fileURLToPath(new URL('../package.json', import.meta.url)));
 const fixturesRoot = path.join(repoRoot, 'tests', 'fixtures');
@@ -29,6 +30,7 @@ try {
       name: 'review_project',
       arguments: { project: 'site' },
     },
+    CallToolResultSchema,
     { timeout: 120_000 },
   );
   assert.notEqual(result.isError, true);
