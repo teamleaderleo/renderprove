@@ -25,6 +25,7 @@
     "schema",
     "docs",
     "build/worker/Containerfile",
+    "scripts/probe-paths.mjs",
     "scripts/probe-podman.sh",
     "scripts/probe-repeatability.sh",
     "scripts/repeatability-report.mjs",
