@@ -91,6 +91,7 @@ export function toolFailure(error) {
     PLAYWRIGHT_UNAVAILABLE: 'Playwright or Chromium is unavailable on this worker.',
     RUNTIME_EXITED: 'The project process exited before becoming ready.',
     RUNTIME_TIMEOUT: 'The project process did not become ready before the timeout.',
+    REVIEW_CANCELLED: 'The browser review was cancelled by the client.',
   };
   return {
     isError: true,
