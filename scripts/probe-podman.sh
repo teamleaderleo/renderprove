@@ -19,7 +19,6 @@ require_command() {
 
 require_command podman
 require_command node
-require_command realpath
 
 case "${build}" in
   0|1) ;;
@@ -28,31 +27,18 @@ case "${build}" in
     exit 2
     ;;
 esac
-case "${output}" in
-  /*|''|.|..|../*|*/../*|*/..)
-    printf 'error: RENDERPROVE_PROBE_OUTPUT must be a project-relative directory\n' >&2
-    exit 2
-    ;;
-esac
 
-project_root="$(realpath -e -- "${repo_root}/${project_arg}")"
-case "${project_root}" in
-  "${repo_root}"|"${repo_root}"/*) ;;
-  *)
-    printf 'error: project must stay inside the Renderprove checkout: %s\n' "${project_root}" >&2
-    exit 2
-    ;;
-esac
-
-evidence_root="$(realpath -m -- "${project_root}/${output}")"
-case "${evidence_root}" in
-  "${project_root}"/*) ;;
-  *)
-    printf 'error: evidence output must stay inside the project: %s\n' "${evidence_root}" >&2
-    exit 2
-    ;;
-esac
-container_output="$(realpath --relative-to="${project_root}" "${evidence_root}")"
+mapfile -d '' -t probe_paths < <(
+  node "${script_dir}/probe-paths.mjs" "${repo_root}" "${project_arg}" "${output}"
+)
+if [ "${#probe_paths[@]}" -ne 4 ]; then
+  printf 'error: unable to resolve enrolled project paths\n' >&2
+  exit 2
+fi
+enrolled_root="${probe_paths[0]}"
+project_root="${probe_paths[1]}"
+evidence_root="${probe_paths[2]}"
+container_output="${probe_paths[3]}"
 
 playwright_version="$(cd "${repo_root}" && node -p "require('./package.json').dependencies.playwright")"
 rm -rf -- "${evidence_root}"
@@ -86,6 +72,7 @@ common_args=(
   --tmpfs=/tmp:rw,nosuid,nodev,size=1g
 )
 
+printf 'Enrolled root: %s\n' "${enrolled_root}"
 printf 'Recording renderer identity...\n'
 podman run "${common_args[@]}" \
   --entrypoint node \
