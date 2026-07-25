@@ -1,0 +1,215 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/interaction-plan-v1.schema.json",
+  "title": "Renderprove interaction plan v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "name", "steps"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "name": { "$ref": "#/$defs/id" },
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 30000 }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": { "$ref": "#/$defs/step" }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$"
+    },
+    "timeoutMs": {
+      "type": "integer",
+      "minimum": 100,
+      "maximum": 30000
+    },
+    "locator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["by", "value"],
+          "properties": {
+            "by": { "const": "testId" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["by", "role"],
+          "properties": {
+            "by": { "const": "role" },
+            "role": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "name": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "exact": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["by", "value"],
+          "properties": {
+            "by": { "enum": ["label", "text"] },
+            "value": { "type": "string", "minLength": 1, "maxLength": 512 },
+            "exact": { "type": "boolean" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["by", "value"],
+          "properties": {
+            "by": { "const": "css" },
+            "value": { "type": "string", "minLength": 1, "maxLength": 512 }
+          }
+        }
+      ]
+    },
+    "point": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["space", "x", "y"],
+          "properties": {
+            "space": { "const": "viewport" },
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["space", "target", "x", "y"],
+          "properties": {
+            "space": { "const": "target" },
+            "target": { "$ref": "#/$defs/locator" },
+            "x": { "type": "number", "minimum": 0, "maximum": 1 },
+            "y": { "type": "number", "minimum": 0, "maximum": 1 }
+          }
+        }
+      ]
+    },
+    "step": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "to"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "pointerMove" },
+            "to": { "$ref": "#/$defs/point" },
+            "durationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+            "steps": { "type": "integer", "minimum": 1, "maximum": 120 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "target"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "click" },
+            "target": {
+              "oneOf": [
+                { "$ref": "#/$defs/locator" },
+                { "$ref": "#/$defs/point" }
+              ]
+            },
+            "timeoutMs": { "$ref": "#/$defs/timeoutMs" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "from", "to"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "drag" },
+            "from": { "$ref": "#/$defs/point" },
+            "to": { "$ref": "#/$defs/point" },
+            "durationMs": { "type": "integer", "minimum": 0, "maximum": 5000 },
+            "steps": { "type": "integer", "minimum": 1, "maximum": 120 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "target", "text"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "fill" },
+            "target": { "$ref": "#/$defs/locator" },
+            "text": { "type": "string", "maxLength": 10000 },
+            "mode": { "enum": ["replace", "append"] },
+            "timeoutMs": { "$ref": "#/$defs/timeoutMs" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "target", "values"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "select" },
+            "target": { "$ref": "#/$defs/locator" },
+            "values": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 20,
+              "uniqueItems": true,
+              "items": { "type": "string", "minLength": 1, "maxLength": 512 }
+            },
+            "timeoutMs": { "$ref": "#/$defs/timeoutMs" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "target", "state"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "waitFor" },
+            "target": { "$ref": "#/$defs/locator" },
+            "state": { "enum": ["attached", "detached", "visible", "hidden"] },
+            "timeoutMs": { "$ref": "#/$defs/timeoutMs" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "durationMs"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "wait" },
+            "durationMs": { "type": "integer", "minimum": 0, "maximum": 5000 }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["id", "type", "name"],
+          "properties": {
+            "id": { "$ref": "#/$defs/id" },
+            "type": { "const": "capture" },
+            "name": { "$ref": "#/$defs/id" },
+            "fullPage": { "type": "boolean" },
+            "target": { "$ref": "#/$defs/locator" }
+          }
+        }
+      ]
+    }
+  }
+}
