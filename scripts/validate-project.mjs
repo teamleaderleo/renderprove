@@ -22,16 +22,20 @@ const required = [
   'src/mcp/results.mjs',
   'src/mcp/review-gate.mjs',
   'src/mcp/server.mjs',
+  'src/probe/repeatability.mjs',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'scripts/validate-package.mjs',
   'scripts/worker-identity.mjs',
   'scripts/probe-podman.sh',
+  'scripts/probe-repeatability.sh',
+  'scripts/repeatability-report.mjs',
   'build/worker/Containerfile',
   'docs/ARCHITECTURE.md',
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
-  'docs/SELF_HOSTED_PROBE.md'
+  'docs/SELF_HOSTED_PROBE.md',
+  'tests/repeatability.test.mjs'
 ];
 
 for (const file of required) await fs.access(new URL(`../${file}`, import.meta.url));
@@ -53,6 +57,9 @@ if (packageJson.bin?.['renderprove-mcp'] !== './bin/renderprove-mcp.mjs') {
 }
 if (packageJson.scripts?.['probe:podman'] !== 'bash scripts/probe-podman.sh') {
   throw new Error('package must expose the Podman renderer probe');
+}
+if (packageJson.scripts?.['probe:repeatability'] !== 'bash scripts/probe-repeatability.sh') {
+  throw new Error('package must expose the repeatability probe');
 }
 if (packageJson.scripts?.['worker:identity'] !== 'node scripts/worker-identity.mjs') {
   throw new Error('package must expose worker identity collection');
