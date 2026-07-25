@@ -13,7 +13,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "timeoutMs": { "$ref": "#/$defs/timeoutMs" }
+        "timeoutMs": { "type": "integer", "minimum": 100, "maximum": 30000 }
       }
     },
     "steps": {
