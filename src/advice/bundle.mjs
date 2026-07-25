@@ -9,12 +9,15 @@ const DEFAULT_MAX_FILES = 64;
 const DEFAULT_MAX_BYTES = 400_000;
 const DEFAULT_MAX_FILE_BYTES = 96_000;
 const TEXT_EXTENSIONS = new Set([
-  '.astro', '.c', '.cc', '.cjs', '.cpp', '.css', '.go', '.h', '.hpp', '.html', '.java', '.js', '.json',
-  '.jsx', '.kt', '.kts', '.md', '.mdx', '.mjs', '.php', '.prisma', '.py', '.rb', '.rs', '.scss', '.sh',
-  '.sql', '.svelte', '.swift', '.toml', '.ts', '.tsx', '.txt', '.vue', '.xml', '.yaml', '.yml',
+  '.astro', '.c', '.cc', '.cjs', '.cpp', '.css', '.go', '.gql', '.graphql', '.h', '.hpp', '.html',
+  '.java', '.js', '.json', '.jsonc', '.jsx', '.kt', '.kts', '.md', '.mdx', '.mjs', '.mod', '.php',
+  '.prisma', '.proto', '.py', '.rb', '.rs', '.scss', '.sh', '.sql', '.sum', '.svelte', '.swift', '.toml',
+  '.ts', '.tsx', '.txt', '.vue', '.xml', '.yaml', '.yml',
 ]);
 const TEXT_BASENAMES = new Set([
-  'Dockerfile', 'Containerfile', 'Gemfile', 'Makefile', 'Procfile', 'README', 'SECURITY', 'LICENSE',
+  '.dockerignore', '.editorconfig', '.gitignore', '.npmignore', '.prettierignore', '.prettierrc',
+  'Cargo.lock', 'Containerfile', 'Dockerfile', 'Gemfile', 'LICENSE', 'Makefile', 'Procfile', 'README',
+  'SECURITY', 'go.mod', 'go.sum',
 ]);
 const DEFAULT_EXCLUDED_DIRECTORIES = new Set([
   '.git', '.next', '.nuxt', '.parcel-cache', '.renderprove', '.renderprove-ci', '.renderprove-probe',
@@ -23,6 +26,10 @@ const DEFAULT_EXCLUDED_DIRECTORIES = new Set([
 ]);
 const SENSITIVE_NAME = /(^|[._-])(credential|credentials|secret|secrets|token|tokens|password|passwd|private|id_rsa|id_ed25519)([._-]|$)|(^|\/)\.env($|\.)|\.(?:key|pem|p12|pfx)$/i;
 const UTF8 = new TextDecoder('utf-8', { fatal: true });
+
+function compareText(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
 
 function isInside(root, candidate) {
   const relative = path.relative(root, candidate);
@@ -83,15 +90,21 @@ async function existingRealPath(projectRoot, requestedPath, label) {
       code: 'UNSAFE_ADVICE_PATH',
     });
   }
-  let real;
+  let stat;
   try {
-    real = await fs.realpath(absolute);
+    stat = await fs.lstat(absolute);
   } catch (cause) {
     throw new RenderproveError(`${label} does not exist.`, {
       code: 'ADVICE_PATH_NOT_FOUND',
       cause,
     });
   }
+  if (stat.isSymbolicLink()) {
+    throw new RenderproveError(`${label} must not be a symbolic link.`, {
+      code: 'UNSAFE_ADVICE_PATH',
+    });
+  }
+  const real = await fs.realpath(absolute);
   if (!isInside(projectRoot, real)) {
     throw new RenderproveError(`${label} resolves outside the project root.`, {
       code: 'UNSAFE_ADVICE_PATH',
@@ -104,7 +117,7 @@ async function walk(candidate, projectRoot, files, omissions, { respectDefaultEx
   const relative = toProjectPath(projectRoot, candidate);
   const base = path.basename(candidate);
   if (relative && SENSITIVE_NAME.test(relative)) {
-    omissions.push({ path: relative, reason: 'sensitive-name' });
+    omissions.push({ path: '[sensitive-path]', reason: 'sensitive-name' });
     return;
   }
   const stat = await fs.lstat(candidate);
@@ -115,7 +128,7 @@ async function walk(candidate, projectRoot, files, omissions, { respectDefaultEx
   if (stat.isDirectory()) {
     if (relative && respectDefaultExcludes && DEFAULT_EXCLUDED_DIRECTORIES.has(base)) return;
     const entries = await fs.readdir(candidate, { withFileTypes: true });
-    entries.sort((left, right) => left.name.localeCompare(right.name));
+    entries.sort((left, right) => compareText(left.name, right.name));
     for (const entry of entries) {
       await walk(path.join(candidate, entry.name), projectRoot, files, omissions, { respectDefaultExcludes });
     }
@@ -135,7 +148,8 @@ function priority(projectRoot, filePath, manifestPath, receiptPath) {
 
 async function readCandidate(filePath, projectRoot, maxFileBytes) {
   const relative = toProjectPath(projectRoot, filePath);
-  const stat = await fs.stat(filePath);
+  const stat = await fs.lstat(filePath);
+  if (stat.isSymbolicLink()) return { omission: { path: relative, reason: 'symlink' } };
   if (stat.size > maxFileBytes) return { omission: { path: relative, reason: 'file-too-large', bytes: stat.size } };
   const buffer = await fs.readFile(filePath);
   if (buffer.includes(0)) return { omission: { path: relative, reason: 'binary' } };
@@ -170,11 +184,12 @@ export async function buildAdviceBundle({
 } = {}) {
   const projectReal = await fs.realpath(path.resolve(projectRoot));
   const manifest = await loadManifest({ projectRoot: projectReal, manifestPath });
+  const resolvedManifest = await existingRealPath(projectReal, manifest.sourcePath, 'Manifest path');
   const fileLimit = normalizeLimit(maxFiles, DEFAULT_MAX_FILES, 'maxFiles', { min: 1, max: 256 });
   const byteLimit = normalizeLimit(maxBytes, DEFAULT_MAX_BYTES, 'maxBytes', { min: 1_024, max: 4_000_000 });
   const perFileLimit = normalizeLimit(maxFileBytes, DEFAULT_MAX_FILE_BYTES, 'maxFileBytes', { min: 1_024, max: 1_000_000 });
   const omissions = [];
-  const candidates = new Set([manifest.sourcePath]);
+  const candidates = new Set([resolvedManifest]);
 
   let resolvedReceipt = null;
   const defaultReceipt = path.join(projectReal, manifest.review.outputDir, 'receipt.json');
@@ -183,10 +198,10 @@ export async function buildAdviceBundle({
     candidates.add(resolvedReceipt);
   } else {
     try {
-      resolvedReceipt = await fs.realpath(defaultReceipt);
-      if (isInside(projectReal, resolvedReceipt)) candidates.add(resolvedReceipt);
+      resolvedReceipt = await existingRealPath(projectReal, defaultReceipt, 'Receipt path');
+      candidates.add(resolvedReceipt);
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error;
+      if (error?.code !== 'ADVICE_PATH_NOT_FOUND') throw error;
       omissions.push({ path: toProjectPath(projectReal, defaultReceipt), reason: 'receipt-missing' });
     }
   }
@@ -201,9 +216,9 @@ export async function buildAdviceBundle({
   }
 
   const ordered = [...candidates].sort((left, right) => {
-    const difference = priority(projectReal, left, manifest.sourcePath, resolvedReceipt)
-      - priority(projectReal, right, manifest.sourcePath, resolvedReceipt);
-    return difference || toProjectPath(projectReal, left).localeCompare(toProjectPath(projectReal, right));
+    const difference = priority(projectReal, left, resolvedManifest, resolvedReceipt)
+      - priority(projectReal, right, resolvedManifest, resolvedReceipt);
+    return difference || compareText(toProjectPath(projectReal, left), toProjectPath(projectReal, right));
   });
 
   const files = [];
@@ -248,7 +263,7 @@ export async function buildAdviceBundle({
     version: 1,
     generatedAt: new Date().toISOString(),
     project: manifest.project,
-    manifest: toProjectPath(projectReal, manifest.sourcePath),
+    manifest: toProjectPath(projectReal, resolvedManifest),
     receipt: resolvedReceipt ? toProjectPath(projectReal, resolvedReceipt) : null,
     sha256,
     limits: { maxFiles: fileLimit, maxBytes: byteLimit, maxFileBytes: perFileLimit },
