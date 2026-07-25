@@ -94,7 +94,7 @@ export async function createRenderproveMcpServer({
         openWorldHint: true,
       },
     },
-    async ({ project = '.', manifest }) => {
+    async ({ project = '.', manifest }, extra) => {
       let releaseReview;
       try {
         const resolved = await resolveMcpProject(operatorRoot, project);
@@ -109,6 +109,7 @@ export async function createRenderproveMcpServer({
           projectRoot: resolved.projectRoot,
           manifestPath,
           headed: false,
+          signal: extra.signal,
         });
         return toolSuccess(
           sanitizeReceiptForMcp(receipt, resolved.projectPath),
