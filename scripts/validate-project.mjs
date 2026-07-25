@@ -36,7 +36,9 @@ const required = [
   'docs/INTERACTIONS.md',
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
-  'docs/SELF_HOSTED_PROBE.md'
+  'docs/SELF_HOSTED_PROBE.md',
+  'tests/interaction-plan.test.mjs',
+  'tests/interaction-coordinates.test.mjs'
 ];
 
 for (const file of required) await fs.access(new URL(`../${file}`, import.meta.url));

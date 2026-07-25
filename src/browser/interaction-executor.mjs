@@ -1,6 +1,15 @@
 import { RenderproveError } from '../core/errors.mjs';
 import { normalizeInteractionPlan } from './interaction-plan.mjs';
 
+const PUBLIC_FAILURE_CODES = new Set([
+  'INTERACTION_TIMEOUT',
+  'INTERACTION_TARGET_UNAVAILABLE',
+  'INTERACTION_VIEWPORT_UNAVAILABLE',
+  'INTERACTION_CAPTURE_UNAVAILABLE',
+  'INTERACTION_LOCATOR_UNSUPPORTED',
+  'INTERACTION_STEP_UNSUPPORTED',
+]);
+
 function cancellationError(signal) {
   if (signal?.reason instanceof RenderproveError) return signal.reason;
   return new RenderproveError('Interaction plan was cancelled.', {
@@ -36,17 +45,23 @@ function createLocator(page, target) {
   throw new RenderproveError(`Unsupported locator type ${target.by}.`, { code: 'INTERACTION_LOCATOR_UNSUPPORTED' });
 }
 
-function remainingMs(deadline, label) {
+function remainingMs(deadline, label, timeoutMs) {
   const remaining = deadline - Date.now();
-  if (remaining <= 0) throw timeoutError(label, 0);
+  if (remaining <= 0) throw timeoutError(label, timeoutMs);
   return remaining;
 }
 
-async function resolveLocatorPoint(page, target, xRatio, yRatio, timeoutMs) {
+function interiorCoordinate(origin, size, ratio) {
+  const inset = Math.min(0.5, size / 2);
+  const start = origin + inset;
+  const end = origin + size - inset;
+  return start + ((end - start) * ratio);
+}
+
+async function resolveLocatorPoint(page, target, xRatio, yRatio, timeoutMs, deadline = Date.now() + timeoutMs) {
   const locator = createLocator(page, target);
-  const deadline = Date.now() + timeoutMs;
-  await locator.waitFor({ state: 'visible', timeout: remainingMs(deadline, 'Interaction target resolution') });
-  await locator.scrollIntoViewIfNeeded({ timeout: remainingMs(deadline, 'Interaction target resolution') });
+  await locator.waitFor({ state: 'visible', timeout: remainingMs(deadline, 'Interaction target resolution', timeoutMs) });
+  await locator.scrollIntoViewIfNeeded({ timeout: remainingMs(deadline, 'Interaction target resolution', timeoutMs) });
   const box = await locator.boundingBox();
   if (!box || box.width <= 0 || box.height <= 0) {
     throw new RenderproveError('Interaction target does not have a visible bounding box.', {
@@ -56,8 +71,8 @@ async function resolveLocatorPoint(page, target, xRatio, yRatio, timeoutMs) {
   return {
     locator,
     point: {
-      x: box.x + (box.width * xRatio),
-      y: box.y + (box.height * yRatio),
+      x: interiorCoordinate(box.x, box.width, xRatio),
+      y: interiorCoordinate(box.y, box.height, yRatio),
     },
   };
 }
@@ -72,7 +87,10 @@ async function resolvePoint(page, point, timeoutMs) {
     }
     return {
       locator: null,
-      point: { x: viewport.width * point.x, y: viewport.height * point.y },
+      point: {
+        x: interiorCoordinate(0, viewport.width, point.x),
+        y: interiorCoordinate(0, viewport.height, point.y),
+      },
     };
   }
   return resolveLocatorPoint(page, point.target, point.x, point.y, timeoutMs);
@@ -150,6 +168,10 @@ function stepResult(step, index, startedAt, details = {}) {
   });
 }
 
+function publicFailureCode(cause) {
+  return PUBLIC_FAILURE_CODES.has(cause?.code) ? cause.code : 'INTERACTION_OPERATION_FAILED';
+}
+
 async function executeStep(page, step, pointerState, { capture, signal }) {
   throwIfAborted(signal);
 
@@ -166,8 +188,9 @@ async function executeStep(page, step, pointerState, { capture, signal }) {
       pointerState.x = destination.point.x;
       pointerState.y = destination.point.y;
     } else {
-      const destination = await resolveLocatorPoint(page, step.target, 0.5, 0.5, step.timeoutMs);
-      await destination.locator.click({ timeout: step.timeoutMs });
+      const deadline = Date.now() + step.timeoutMs;
+      const destination = await resolveLocatorPoint(page, step.target, 0.5, 0.5, step.timeoutMs, deadline);
+      await destination.locator.click({ timeout: remainingMs(deadline, 'Interaction click', step.timeoutMs) });
       pointerState.x = destination.point.x;
       pointerState.y = destination.point.y;
     }
@@ -270,13 +293,13 @@ export async function runInteractionPlan(page, input, {
       if (cause?.code === 'INTERACTION_CANCELLED' || signal?.aborted) throw cancellationError(signal);
       throw new RenderproveError(`Interaction step ${step.id} failed.`, {
         code: 'INTERACTION_STEP_FAILED',
-        cause,
         details: {
           plan: plan.name,
           stepId: step.id,
           stepType: step.type,
           stepIndex: index,
           completedSteps: results.length,
+          failureCode: publicFailureCode(cause),
         },
       });
     }
