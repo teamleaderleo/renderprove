@@ -24,6 +24,8 @@
     "docs",
     "build/worker/Containerfile",
     "scripts/probe-podman.sh",
+    "scripts/probe-repeatability.sh",
+    "scripts/repeatability-report.mjs",
     "scripts/worker-identity.mjs",
     "README.md",
     "SECURITY.md",
@@ -37,6 +39,7 @@
     "test:browser": "node tests/browser-smoke.mjs && node tests/mcp-browser-smoke.mjs",
     "worker:identity": "node scripts/worker-identity.mjs",
     "probe:podman": "bash scripts/probe-podman.sh",
+    "probe:repeatability": "bash scripts/probe-repeatability.sh",
     "ci": "npm run check && npm run check:package && npm test"
   },
   "dependencies": {
