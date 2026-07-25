@@ -46,6 +46,7 @@ image_digest="$(podman image inspect --format '{{if .Digest}}{{.Digest}}{{end}}'
 common_args=(
   --rm
   --init
+  --userns=keep-id
   --ipc=host
   --network=none
   --cap-drop=all
