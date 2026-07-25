@@ -17,7 +17,18 @@
     "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
     "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json"
   },
-  "files": ["bin", "src", "schema", "docs", "README.md", "SECURITY.md", "LICENSE"],
+  "files": [
+    "bin",
+    "src",
+    "schema",
+    "docs",
+    "build/worker/Containerfile",
+    "scripts/probe-podman.sh",
+    "scripts/worker-identity.mjs",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
   "engines": { "node": ">=22" },
   "scripts": {
     "check": "node scripts/validate-project.mjs",
