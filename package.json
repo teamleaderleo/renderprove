@@ -24,6 +24,8 @@
     "check:package": "node scripts/validate-package.mjs",
     "test": "node --test",
     "test:browser": "node tests/browser-smoke.mjs && node tests/mcp-browser-smoke.mjs",
+    "worker:identity": "node scripts/worker-identity.mjs",
+    "probe:podman": "bash scripts/probe-podman.sh",
     "ci": "npm run check && npm run check:package && npm test"
   },
   "dependencies": {
