@@ -12,6 +12,10 @@ const required = [
   'bin/renderprove-mcp.mjs',
   'src/cli.mjs',
   'src/service.mjs',
+  'src/advice.mjs',
+  'src/advice/bundle.mjs',
+  'src/advice/cloudflare.mjs',
+  'src/advice/service.mjs',
   'src/interaction.mjs',
   'src/version.mjs',
   'src/core/manifest.mjs',
@@ -27,6 +31,7 @@ const required = [
   'src/mcp/server.mjs',
   'src/probe/enrollment.mjs',
   'src/probe/repeatability.mjs',
+  'schema/advice-v1.schema.json',
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
@@ -37,11 +42,14 @@ const required = [
   'scripts/probe-repeatability.sh',
   'scripts/repeatability-report.mjs',
   'build/worker/Containerfile',
+  'docs/AI_ADVISORY.md',
   'docs/ARCHITECTURE.md',
   'docs/INTERACTIONS.md',
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
   'docs/SELF_HOSTED_PROBE.md',
+  'tests/advice-bundle.test.mjs',
+  'tests/advice-cloudflare.test.mjs',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',
   'tests/probe-enrollment.test.mjs',
@@ -49,7 +57,7 @@ const required = [
 ];
 
 for (const file of required) await fs.access(new URL(`../${file}`, import.meta.url));
-for (const schema of ['interaction-plan-v1.schema.json', 'manifest-v1.schema.json', 'receipt-v1.schema.json']) {
+for (const schema of ['advice-v1.schema.json', 'interaction-plan-v1.schema.json', 'manifest-v1.schema.json', 'receipt-v1.schema.json']) {
   const parsed = JSON.parse(await fs.readFile(new URL(`../schema/${schema}`, import.meta.url), 'utf8'));
   if (parsed.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
     throw new Error(`${schema} must use JSON Schema 2020-12`);
@@ -65,8 +73,14 @@ if (packageLock.version !== VERSION || packageLock.packages['']?.version !== VER
 if (packageJson.bin?.['renderprove-mcp'] !== './bin/renderprove-mcp.mjs') {
   throw new Error('package must expose the renderprove-mcp executable');
 }
+if (packageJson.exports?.['./advice'] !== './src/advice.mjs') {
+  throw new Error('package must expose the optional advisory API');
+}
 if (packageJson.exports?.['./interaction'] !== './src/interaction.mjs') {
   throw new Error('package must expose the bounded interaction API');
+}
+if (packageJson.exports?.['./schema/advice-v1.schema.json'] !== './schema/advice-v1.schema.json') {
+  throw new Error('package must expose the advice result schema');
 }
 if (packageJson.exports?.['./schema/interaction-plan-v1.schema.json'] !== './schema/interaction-plan-v1.schema.json') {
   throw new Error('package must expose the interaction plan schema');
