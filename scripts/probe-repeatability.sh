@@ -16,7 +16,6 @@ require_command() {
 
 require_command bash
 require_command node
-require_command realpath
 require_command seq
 
 case "${runs}" in
@@ -30,30 +29,15 @@ if [ "${runs}" -lt 2 ] || [ "${runs}" -gt 20 ]; then
   exit 2
 fi
 
-case "${output}" in
-  /*|''|.|..|../*|*/../*|*/..)
-    printf 'error: RENDERPROVE_REPEAT_OUTPUT must be a project-relative directory\n' >&2
-    exit 2
-    ;;
-esac
-
-project_root="$(realpath -e -- "${repo_root}/${project_arg}")"
-case "${project_root}" in
-  "${repo_root}"|"${repo_root}"/*) ;;
-  *)
-    printf 'error: project must stay inside the Renderprove checkout: %s\n' "${project_root}" >&2
-    exit 2
-    ;;
-esac
-
-repeat_root="$(realpath -m -- "${project_root}/${output}")"
-case "${repeat_root}" in
-  "${project_root}"/*) ;;
-  *)
-    printf 'error: repeatability output must stay inside the project: %s\n' "${repeat_root}" >&2
-    exit 2
-    ;;
-esac
+mapfile -d '' -t probe_paths < <(
+  node "${script_dir}/probe-paths.mjs" "${repo_root}" "${project_arg}" "${output}"
+)
+if [ "${#probe_paths[@]}" -ne 4 ]; then
+  printf 'error: unable to resolve enrolled project paths\n' >&2
+  exit 2
+fi
+project_root="${probe_paths[1]}"
+repeat_root="${probe_paths[2]}"
 
 rm -rf -- "${repeat_root}"
 mkdir -p -- "${repeat_root}/runs"
@@ -76,6 +60,7 @@ status=$?
 set -e
 mv -- "${report_tmp}" "${report_path}"
 
-printf '\nRepeatability report: %s\n' "${report_path}"
+printf '\nProject: %s\n' "${project_root}"
+printf 'Repeatability report: %s\n' "${report_path}"
 node -e "const value=require(process.argv[1]); console.log('Status: ' + value.status + '; stable cases: ' + value.summary.stableCases + '/' + value.summary.cases)" "${report_path}"
 exit "${status}"
