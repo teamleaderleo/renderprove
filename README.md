@@ -26,6 +26,19 @@ npx renderprove review
 
 The review exits with `0` when every case passes, `1` when browser evidence violates the declared policy, and `2` for configuration or execution failures.
 
+## Self-hosted renderer probe
+
+A trusted Linux checkout can build a pinned Playwright worker image and run the fixture review inside a disposable rootless Podman container:
+
+```bash
+npm ci --ignore-scripts
+npm run probe:podman
+```
+
+The probe disables outbound networking, applies CPU, memory, PID, capability, and temporary-filesystem limits, records Chromium, OS, architecture, Node, locale, timezone, image, and font identities, and writes evidence beneath `tests/fixtures/site/.renderprove-probe`.
+
+The initial path is intended for the existing Lima Ubuntu lab VM. SmolRunner remains the eventual owner of runner lifecycle and disposable execution; Renderprove owns the browser review and receipt. See [self-hosted renderer probe](docs/SELF_HOSTED_PROBE.md).
+
 ## Local MCP
 
 A local coding agent can call the same implementation through stdio:
@@ -99,6 +112,7 @@ Included now:
 - strict versioned JSON manifests and receipts
 - Playwright Chromium receipts
 - bounded local stdio MCP tools
+- a pinned self-hosted Podman renderer probe for trusted revisions
 - locked core, package, executable, MCP, and browser CI
 
 Planned after this contract proves useful:

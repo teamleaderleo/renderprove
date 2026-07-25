@@ -25,9 +25,13 @@ const required = [
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'scripts/validate-package.mjs',
+  'scripts/worker-identity.mjs',
+  'scripts/probe-podman.sh',
+  'build/worker/Containerfile',
   'docs/ARCHITECTURE.md',
   'docs/MCP.md',
-  'docs/RECEIPT_V1.md'
+  'docs/RECEIPT_V1.md',
+  'docs/SELF_HOSTED_PROBE.md'
 ];
 
 for (const file of required) await fs.access(new URL(`../${file}`, import.meta.url));
@@ -46,6 +50,12 @@ if (packageLock.version !== VERSION || packageLock.packages['']?.version !== VER
 }
 if (packageJson.bin?.['renderprove-mcp'] !== './bin/renderprove-mcp.mjs') {
   throw new Error('package must expose the renderprove-mcp executable');
+}
+if (packageJson.scripts?.['probe:podman'] !== 'bash scripts/probe-podman.sh') {
+  throw new Error('package must expose the Podman renderer probe');
+}
+if (packageJson.scripts?.['worker:identity'] !== 'node scripts/worker-identity.mjs') {
+  throw new Error('package must expose worker identity collection');
 }
 if (packageJson.license !== 'Apache-2.0') throw new Error('license must be Apache-2.0');
 console.log(`Validated ${required.length} required files.`);
