@@ -4,7 +4,7 @@
 
 Renderprove owns project-aware inspection. It does not own durable coordination, general CI scheduling, production deployment, or arbitrary agent reasoning.
 
-- **Renderprove:** manifests, project startup, browser review, evidence, receipts.
+- **Renderprove:** manifests, project startup, browser review, evidence, receipts, and bounded inspection tools.
 - **SmolRunner:** trusted workers, bounded execution, leased workspaces and previews.
 - **Stensibly:** requests, claims, handoffs, events, and artifact references.
 - **Playwright:** browser implementation behind Renderprove's narrower contract.
@@ -34,7 +34,18 @@ The initial worker is single-operator and trusted-code only. Renderprove does no
 - Browser contexts are isolated per review case and discarded immediately.
 - Fork pull requests must not automatically reach personal self-hosted workers.
 
-The initial lexical path checks assume trusted repository contents. Symlink-hostile workspaces require a stronger sandbox boundary such as a SmolRunner-managed container.
+The CLI's lexical path checks assume trusted repository contents. The local MCP adds operator-root and selected-project real-path checks, plus runtime and evidence-directory checks. A repository runtime can still execute arbitrary code; symlink-hostile or untrusted workspaces require a stronger sandbox boundary such as a SmolRunner-managed container.
+
+## Agent interface
+
+The first agent interface is local stdio MCP with two tools:
+
+- `inspect_project`: validate and summarize enrolled configuration
+- `review_project`: run the existing browser review and return a sanitized receipt
+
+The operator fixes the project root at process startup. Tool calls cannot widen that root, choose arbitrary commands, receive environment values or runtime logs, or control Chrome directly. One project review may run at a time per MCP process.
+
+Remote HTTP transport requires a separate authentication and tenancy design. Raw browser control remains an implementation detail or a trusted local diagnostic mode rather than part of Renderprove's public agent contract.
 
 ## Adapter direction
 
@@ -47,7 +58,3 @@ Framework support should normalize into the same manifest rather than branching 
 - Deployed adapter: review an existing HTTP origin without starting a process.
 
 Autodetection may propose configuration later. Committed configuration remains authoritative.
-
-## Agent interface
-
-The future MCP surface should expose project operations such as `inspect_project`, `review_project`, `compare_receipts`, and `stop_preview`. Raw unrestricted Chrome control stays an implementation detail or trusted local diagnostic mode.
