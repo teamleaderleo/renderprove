@@ -10,10 +10,12 @@
   },
   "exports": {
     ".": "./src/index.mjs",
+    "./interaction": "./src/interaction.mjs",
     "./manifest": "./src/core/manifest.mjs",
     "./receipt": "./src/core/receipt.mjs",
     "./mcp": "./src/mcp/server.mjs",
     "./version": "./src/version.mjs",
+    "./schema/interaction-plan-v1.schema.json": "./schema/interaction-plan-v1.schema.json",
     "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
     "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json"
   },
@@ -23,7 +25,7 @@
     "check": "node scripts/validate-project.mjs",
     "check:package": "node scripts/validate-package.mjs",
     "test": "node --test",
-    "test:browser": "node tests/browser-smoke.mjs && node tests/mcp-browser-smoke.mjs",
+    "test:browser": "node tests/browser-smoke.mjs && node tests/mcp-browser-smoke.mjs && node tests/interaction-browser-smoke.mjs",
     "ci": "npm run check && npm run check:package && npm test"
   },
   "dependencies": {
