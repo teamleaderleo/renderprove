@@ -3,12 +3,12 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod';
 import { inspectProject, reviewProject } from '../service.mjs';
 import { VERSION } from '../version.mjs';
-import { RenderproveError } from '../core/errors.mjs';
 import {
   resolveMcpManifest,
   resolveMcpProject,
   resolveOperatorRoot,
 } from './projects.mjs';
+import { ProjectReviewGate } from './review-gate.mjs';
 import {
   sanitizeManifestForMcp,
   sanitizeReceiptForMcp,
@@ -36,7 +36,7 @@ export async function createRenderproveMcpServer({
   review = reviewProject,
 } = {}) {
   const operatorRoot = await resolveOperatorRoot(root);
-  const activeReviews = new Set();
+  const reviewGate = new ProjectReviewGate();
   const server = new McpServer(
     { name: 'renderprove', version: VERSION },
     {
@@ -94,21 +94,13 @@ export async function createRenderproveMcpServer({
       },
     },
     async ({ project = '.', manifest }) => {
-      let projectRoot;
-      let reviewClaimed = false;
+      let releaseReview;
       try {
         const resolved = await resolveMcpProject(operatorRoot, project);
-        projectRoot = resolved.projectRoot;
-        if (activeReviews.has(projectRoot)) {
-          throw new RenderproveError('A review is already running for this project.', {
-            code: 'MCP_PROJECT_BUSY',
-          });
-        }
-        const manifestPath = await resolveMcpManifest(projectRoot, manifest);
-        activeReviews.add(projectRoot);
-        reviewClaimed = true;
+        const manifestPath = await resolveMcpManifest(resolved.projectRoot, manifest);
+        releaseReview = reviewGate.claim(resolved.projectRoot);
         const { receipt } = await review({
-          projectRoot,
+          projectRoot: resolved.projectRoot,
           manifestPath,
           headed: false,
         });
@@ -119,7 +111,7 @@ export async function createRenderproveMcpServer({
       } catch (error) {
         return toolFailure(error);
       } finally {
-        if (reviewClaimed) activeReviews.delete(projectRoot);
+        releaseReview?.();
       }
     },
   );
