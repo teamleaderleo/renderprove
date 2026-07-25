@@ -71,6 +71,7 @@ export async function createRenderproveMcpServer({
           projectRoot: resolved.projectRoot,
           manifestPath,
         });
+        await assertMcpReviewPaths(normalized);
         return toolSuccess(
           sanitizeManifestForMcp(normalized, resolved.projectPath),
           manifestSummary(normalized),
