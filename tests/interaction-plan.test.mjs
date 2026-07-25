@@ -18,6 +18,7 @@ function locatorStub(name, events, options = {}) {
     async waitFor(settings) {
       events.push(['waitFor', name, settings]);
       if (options.waitForError) throw options.waitForError;
+      options.afterWaitFor?.();
     },
     async scrollIntoViewIfNeeded(settings) { events.push(['scroll', name, settings]); },
     async boundingBox() {
@@ -34,12 +35,12 @@ function locatorStub(name, events, options = {}) {
   };
 }
 
-function fakePage({ moveErrorAt = null, waitNever = false, fillError = null } = {}) {
+function fakePage({ moveErrorAt = null, waitNever = false, fillError = null, afterWaitFor = null } = {}) {
   const events = [];
   let moveCount = 0;
   const locators = new Map();
   const locate = (name) => {
-    if (!locators.has(name)) locators.set(name, locatorStub(name, events, { fillError }));
+    if (!locators.has(name)) locators.set(name, locatorStub(name, events, { fillError, afterWaitFor }));
     return locators.get(name);
   };
   return {
@@ -191,6 +192,25 @@ test('executes the bounded vocabulary and redacts input text and selectors from 
   });
 });
 
+test('uses one timeout across locator resolution and click action', async () => {
+  const originalNow = Date.now;
+  let now = 1_000;
+  Date.now = () => now;
+  try {
+    const page = fakePage({ afterWaitFor: () => { now += 400; } });
+    await runInteractionPlan(page, basePlan([{
+      id: 'click',
+      type: 'click',
+      target: { by: 'testId', value: 'button' },
+      timeoutMs: 1_000,
+    }]));
+    const click = page.events.find((event) => event[0] === 'click');
+    assert.equal(click[2].timeout, 600);
+  } finally {
+    Date.now = originalNow;
+  }
+});
+
 test('releases the mouse button when a drag fails', async () => {
   const page = fakePage({ moveErrorAt: 2 });
   await assert.rejects(
@@ -208,7 +228,7 @@ test('releases the mouse button when a drag fails', async () => {
   assert.equal(page.events.filter((event) => event[0] === 'mouseUp').length, 1);
 });
 
-test('cancels active waits and times out capture callbacks', async () => {
+test('cancels active waits and reports capture timeouts without raw causes', async () => {
   const page = fakePage({ waitNever: true });
   const controller = new AbortController();
   const pending = runInteractionPlan(page, basePlan([{ id: 'wait', type: 'wait', durationMs: 5_000 }]), {
@@ -224,12 +244,14 @@ test('cancels active waits and times out capture callbacks', async () => {
       name: 'slow',
       timeoutMs: 100,
     }]), { capture: async () => new Promise(() => {}) }),
-    (error) => error.code === 'INTERACTION_STEP_FAILED' && error.cause?.code === 'INTERACTION_TIMEOUT',
+    (error) => error.code === 'INTERACTION_STEP_FAILED'
+      && error.details.failureCode === 'INTERACTION_TIMEOUT'
+      && typeof error.cause === 'undefined',
   );
 });
 
-test('failed steps expose bounded metadata without locator or text values', async () => {
-  const page = fakePage({ fillError: new Error('sensitive internal failure') });
+test('failed steps expose bounded metadata without raw causes, locators, or text values', async () => {
+  const page = fakePage({ fillError: new Error('locator #secret-selector rejected secret input') });
   let failure;
   try {
     await runInteractionPlan(page, basePlan([{
@@ -248,6 +270,10 @@ test('failed steps expose bounded metadata without locator or text values', asyn
     stepType: 'fill',
     stepIndex: 0,
     completedSteps: 0,
+    failureCode: 'INTERACTION_OPERATION_FAILED',
   });
+  assert.equal(failure.cause, undefined);
+  assert.equal(failure.message.includes('secret'), false);
+  assert.equal(failure.stack.includes('secret'), false);
   assert.equal(JSON.stringify(failure.details).includes('secret'), false);
 });
