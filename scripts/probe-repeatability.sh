@@ -7,6 +7,18 @@ project_arg="${1:-tests/fixtures/site}"
 runs="${RENDERPROVE_REPEAT_RUNS:-5}"
 output="${RENDERPROVE_REPEAT_OUTPUT:-.renderprove-repeatability}"
 
+require_command() {
+  command -v "$1" >/dev/null 2>&1 || {
+    printf 'error: required command is unavailable: %s\n' "$1" >&2
+    exit 2
+  }
+}
+
+require_command bash
+require_command node
+require_command realpath
+require_command seq
+
 case "${runs}" in
   ''|*[!0-9]*)
     printf 'error: RENDERPROVE_REPEAT_RUNS must be an integer\n' >&2
@@ -26,6 +38,14 @@ case "${output}" in
 esac
 
 project_root="$(realpath -e -- "${repo_root}/${project_arg}")"
+case "${project_root}" in
+  "${repo_root}"|"${repo_root}"/*) ;;
+  *)
+    printf 'error: project must stay inside the Renderprove checkout: %s\n' "${project_root}" >&2
+    exit 2
+    ;;
+esac
+
 repeat_root="$(realpath -m -- "${project_root}/${output}")"
 case "${repeat_root}" in
   "${project_root}"/*) ;;
