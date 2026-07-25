@@ -18,10 +18,13 @@ const required = [
   'src/index.mjs',
   'src/version.mjs',
   'src/mcp/server.mjs',
+  'src/probe/repeatability.mjs',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'build/worker/Containerfile',
   'scripts/probe-podman.sh',
+  'scripts/probe-repeatability.sh',
+  'scripts/repeatability-report.mjs',
   'scripts/worker-identity.mjs',
   'docs/ARCHITECTURE.md',
   'docs/MCP.md',
@@ -31,7 +34,7 @@ const required = [
 for (const file of required) {
   if (!files.has(file)) throw new Error(`npm package is missing ${file}`);
 }
-for (const privatePath of ['tests/core.test.mjs', 'tests/mcp.test.mjs', '.github/workflows/ci.yml']) {
+for (const privatePath of ['tests/core.test.mjs', 'tests/mcp.test.mjs', 'tests/repeatability.test.mjs', '.github/workflows/ci.yml']) {
   if (files.has(privatePath)) throw new Error(`npm package unexpectedly includes ${privatePath}`);
 }
 console.log(`Validated npm package ${pack.name}@${pack.version} with ${files.size} files.`);
