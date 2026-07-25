@@ -24,15 +24,25 @@ const required = [
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
+  'build/worker/Containerfile',
+  'scripts/probe-podman.sh',
+  'scripts/worker-identity.mjs',
   'docs/ARCHITECTURE.md',
   'docs/INTERACTIONS.md',
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
+  'docs/SELF_HOSTED_PROBE.md',
 ];
 for (const file of required) {
   if (!files.has(file)) throw new Error(`npm package is missing ${file}`);
 }
-for (const privatePath of ['tests/core.test.mjs', 'tests/mcp.test.mjs', 'tests/interaction-plan.test.mjs', '.github/workflows/ci.yml']) {
+for (const privatePath of [
+  'tests/core.test.mjs',
+  'tests/mcp.test.mjs',
+  'tests/interaction-plan.test.mjs',
+  'tests/interaction-coordinates.test.mjs',
+  '.github/workflows/ci.yml',
+]) {
   if (files.has(privatePath)) throw new Error(`npm package unexpectedly includes ${privatePath}`);
 }
 console.log(`Validated npm package ${pack.name}@${pack.version} with ${files.size} files.`);
