@@ -7,6 +7,8 @@ project_arg="${1:-tests/fixtures/site}"
 image="${RENDERPROVE_WORKER_IMAGE:-localhost/renderprove-worker:probe}"
 memory="${RENDERPROVE_PROBE_MEMORY:-2g}"
 cpus="${RENDERPROVE_PROBE_CPUS:-2}"
+build="${RENDERPROVE_PROBE_BUILD:-1}"
+output="${RENDERPROVE_PROBE_OUTPUT:-.renderprove-probe}"
 
 require_command() {
   command -v "$1" >/dev/null 2>&1 || {
@@ -19,6 +21,20 @@ require_command podman
 require_command node
 require_command realpath
 
+case "${build}" in
+  0|1) ;;
+  *)
+    printf 'error: RENDERPROVE_PROBE_BUILD must be 0 or 1\n' >&2
+    exit 2
+    ;;
+esac
+case "${output}" in
+  /*|''|.|..|../*|*/../*|*/..)
+    printf 'error: RENDERPROVE_PROBE_OUTPUT must be a project-relative directory\n' >&2
+    exit 2
+    ;;
+esac
+
 project_root="$(realpath -e -- "${repo_root}/${project_arg}")"
 case "${project_root}" in
   "${repo_root}"|"${repo_root}"/*) ;;
@@ -28,17 +44,30 @@ case "${project_root}" in
     ;;
 esac
 
+evidence_root="$(realpath -m -- "${project_root}/${output}")"
+case "${evidence_root}" in
+  "${project_root}"/*) ;;
+  *)
+    printf 'error: evidence output must stay inside the project: %s\n' "${evidence_root}" >&2
+    exit 2
+    ;;
+esac
+container_output="$(realpath --relative-to="${project_root}" "${evidence_root}")"
+
 playwright_version="$(cd "${repo_root}" && node -p "require('./package.json').dependencies.playwright")"
-evidence_root="${project_root}/.renderprove-probe"
 rm -rf -- "${evidence_root}"
 mkdir -p -- "${evidence_root}"
 
-printf 'Building %s with Playwright %s...\n' "${image}" "${playwright_version}"
-podman build \
-  --build-arg "PLAYWRIGHT_VERSION=${playwright_version}" \
-  --file "${repo_root}/build/worker/Containerfile" \
-  --tag "${image}" \
-  "${repo_root}"
+if [ "${build}" -eq 1 ]; then
+  printf 'Building %s with Playwright %s...\n' "${image}" "${playwright_version}"
+  podman build \
+    --build-arg "PLAYWRIGHT_VERSION=${playwright_version}" \
+    --file "${repo_root}/build/worker/Containerfile" \
+    --tag "${image}" \
+    "${repo_root}"
+else
+  printf 'Reusing worker image %s...\n' "${image}"
+fi
 
 image_id="$(podman image inspect --format '{{.Id}}' "${image}")"
 image_digest="$(podman image inspect --format '{{if .Digest}}{{.Digest}}{{end}}' "${image}" 2>/dev/null || true)"
@@ -71,7 +100,7 @@ printf 'Reviewing %s...\n' "${project_root}"
 podman run "${common_args[@]}" \
   --volume "${project_root}:/workspace/project:rw,Z" \
   "${image}" \
-  review /workspace/project --output .renderprove-probe --json \
+  review /workspace/project --output "${container_output}" --json \
   > "${evidence_root}/review.stdout.json"
 
 printf 'Probe complete.\n'
