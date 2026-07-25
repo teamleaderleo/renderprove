@@ -19,26 +19,18 @@ function locatorStub(name, events, options = {}) {
       events.push(['waitFor', name, settings]);
       if (options.waitForError) throw options.waitForError;
     },
-    async scrollIntoViewIfNeeded(settings) {
-      events.push(['scroll', name, settings]);
-    },
+    async scrollIntoViewIfNeeded(settings) { events.push(['scroll', name, settings]); },
     async boundingBox() {
       events.push(['box', name]);
       return options.box ?? { x: 100, y: 50, width: 200, height: 100 };
     },
-    async click(settings) {
-      events.push(['click', name, settings]);
-    },
+    async click(settings) { events.push(['click', name, settings]); },
     async fill(text, settings) {
       events.push(['fill', name, text, settings]);
       if (options.fillError) throw options.fillError;
     },
-    async pressSequentially(text, settings) {
-      events.push(['append', name, text, settings]);
-    },
-    async selectOption(values, settings) {
-      events.push(['select', name, values, settings]);
-    },
+    async pressSequentially(text, settings) { events.push(['append', name, text, settings]); },
+    async selectOption(values, settings) { events.push(['select', name, values, settings]); },
   };
 }
 
@@ -75,7 +67,7 @@ function fakePage({ moveErrorAt = null, waitNever = false, fillError = null } = 
   };
 }
 
-test('normalizes every interaction step and accounts for target resolution', () => {
+test('normalizes every interaction step and accounts for target resolution and locator clicks', () => {
   const plan = normalizeInteractionPlan(basePlan([
     {
       id: 'move',
@@ -102,7 +94,7 @@ test('normalizes every interaction step and accounts for target resolution', () 
   assert.equal(plan.steps[0].steps, 7);
   assert.equal(plan.steps[1].target.exact, true);
   assert.equal(plan.steps[3].mode, 'replace');
-  assert.equal(plan.declaredBudgetMs, 8_350);
+  assert.equal(plan.declaredBudgetMs, 9_350);
   assert.equal(Object.isFrozen(plan), true);
   assert.equal(Object.isFrozen(plan.steps), true);
 });
