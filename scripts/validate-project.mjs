@@ -9,6 +9,7 @@ const required = [
   'package.json',
   'package-lock.json',
   'bin/renderprove.mjs',
+  'bin/renderprove-mcp.mjs',
   'src/cli.mjs',
   'src/service.mjs',
   'src/version.mjs',
@@ -16,10 +17,16 @@ const required = [
   'src/core/receipt.mjs',
   'src/runtime/process.mjs',
   'src/browser/review.mjs',
+  'src/mcp/cli.mjs',
+  'src/mcp/projects.mjs',
+  'src/mcp/results.mjs',
+  'src/mcp/review-gate.mjs',
+  'src/mcp/server.mjs',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'scripts/validate-package.mjs',
   'docs/ARCHITECTURE.md',
+  'docs/MCP.md',
   'docs/RECEIPT_V1.md'
 ];
 
@@ -36,6 +43,9 @@ if (packageJson.name !== 'renderprove') throw new Error('package name must be re
 if (packageJson.version !== VERSION) throw new Error('package and CLI versions must match');
 if (packageLock.version !== VERSION || packageLock.packages['']?.version !== VERSION) {
   throw new Error('package lock version must match the package version');
+}
+if (packageJson.bin?.['renderprove-mcp'] !== './bin/renderprove-mcp.mjs') {
+  throw new Error('package must expose the renderprove-mcp executable');
 }
 if (packageJson.license !== 'Apache-2.0') throw new Error('license must be Apache-2.0');
 console.log(`Validated ${required.length} required files.`);

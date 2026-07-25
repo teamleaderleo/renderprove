@@ -17,6 +17,18 @@ function pushDiagnostic(diagnostics, diagnostic) {
   diagnostics.push({ at: new Date().toISOString(), ...diagnostic });
 }
 
+function cancellationError(signal) {
+  if (signal?.reason instanceof RenderproveError) return signal.reason;
+  return new RenderproveError('Browser review was cancelled.', {
+    code: 'REVIEW_CANCELLED',
+    cause: signal?.reason instanceof Error ? signal.reason : undefined,
+  });
+}
+
+function throwIfAborted(signal) {
+  if (signal?.aborted) throw cancellationError(signal);
+}
+
 export function isSameOrigin(baseUrl, candidateUrl) {
   try {
     return new URL(baseUrl).origin === new URL(candidateUrl).origin;
@@ -25,7 +37,14 @@ export function isSameOrigin(baseUrl, candidateUrl) {
   }
 }
 
-export async function runBrowserReview(manifest, { baseUrl, outputRoot, headed = false, chromium: chromiumOverride } = {}) {
+export async function runBrowserReview(manifest, {
+  baseUrl,
+  outputRoot,
+  headed = false,
+  chromium: chromiumOverride,
+  signal,
+} = {}) {
+  throwIfAborted(signal);
   let chromium = chromiumOverride;
   if (!chromium) {
     try {
@@ -38,37 +57,50 @@ export async function runBrowserReview(manifest, { baseUrl, outputRoot, headed =
     }
   }
 
+  throwIfAborted(signal);
   await fs.mkdir(outputRoot, { recursive: true });
   const browser = await chromium.launch({ headless: !headed });
   const cases = [];
   try {
+    throwIfAborted(signal);
     for (const viewport of manifest.review.viewports) {
       for (const route of manifest.review.routes) {
+        throwIfAborted(signal);
         const context = await browser.newContext({
           viewport: { width: viewport.width, height: viewport.height },
           deviceScaleFactor: viewport.deviceScaleFactor,
           reducedMotion: 'reduce',
         });
         try {
-          cases.push(await reviewCase({ manifest, context, baseUrl, outputRoot, viewport, route }));
+          cases.push(await reviewCase({ manifest, context, baseUrl, outputRoot, viewport, route, signal }));
         } finally {
-          await context.close();
+          await context.close().catch((error) => {
+            if (!signal?.aborted) throw error;
+          });
         }
       }
     }
   } finally {
-    await browser.close();
+    await browser.close().catch((error) => {
+      if (!signal?.aborted) throw error;
+    });
   }
+  throwIfAborted(signal);
   return cases;
 }
 
-async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, route }) {
+async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, route, signal }) {
+  throwIfAborted(signal);
   const page = await context.newPage();
   const diagnostics = [];
   const startedAt = new Date().toISOString();
   const requestedUrl = new URL(route.path, `${baseUrl}/`).toString();
   let fatalFailure = false;
   let result;
+  const closeOnAbort = () => {
+    void page.close().catch(() => {});
+  };
+  signal?.addEventListener('abort', closeOnAbort, { once: true });
 
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -97,6 +129,7 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
   });
 
   try {
+    throwIfAborted(signal);
     const response = await page.goto(requestedUrl, {
       waitUntil: 'load',
       timeout: manifest.review.navigationTimeoutMs,
@@ -108,12 +141,14 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       });
     }
     if (route.waitForMs > 0) await page.waitForTimeout(route.waitForMs);
+    throwIfAborted(signal);
 
     const routeDigest = shortDigest(route.path);
     const artifactName = `${safeSegment(viewport.name)}--${safeSegment(route.name, 'root')}--${routeDigest}.png`;
     const screenshotPath = resolveInside(outputRoot, 'screenshots', artifactName);
     await fs.mkdir(path.dirname(screenshotPath), { recursive: true });
     await page.screenshot({ path: screenshotPath, fullPage: route.fullPage });
+    throwIfAborted(signal);
 
     const pageFacts = await page.evaluate(() => ({
       title: document.title,
@@ -142,6 +177,7 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       diagnostics,
     };
   } catch (error) {
+    if (signal?.aborted) throw cancellationError(signal);
     fatalFailure = true;
     pushDiagnostic(diagnostics, { kind: 'page', message: error.message, stack: error.stack });
     result = {
@@ -156,14 +192,18 @@ async function reviewCase({ manifest, context, baseUrl, outputRoot, viewport, ro
       diagnostics,
     };
   } finally {
+    signal?.removeEventListener('abort', closeOnAbort);
     try {
       await page.close();
     } catch (error) {
-      fatalFailure = true;
-      pushDiagnostic(diagnostics, { kind: 'page', message: `Unable to close page: ${error.message}` });
+      if (!signal?.aborted) {
+        fatalFailure = true;
+        pushDiagnostic(diagnostics, { kind: 'page', message: `Unable to close page: ${error.message}` });
+      }
     }
   }
 
+  throwIfAborted(signal);
   result.finishedAt = new Date().toISOString();
   result.status = fatalFailure ? 'failed' : caseStatus(diagnostics, manifest.review.failOn);
   return result;

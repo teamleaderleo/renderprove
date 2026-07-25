@@ -1,14 +1,18 @@
 {
   "name": "renderprove",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Browser evidence for software projects and coding agents.",
   "type": "module",
   "sideEffects": false,
-  "bin": { "renderprove": "./bin/renderprove.mjs" },
+  "bin": {
+    "renderprove": "./bin/renderprove.mjs",
+    "renderprove-mcp": "./bin/renderprove-mcp.mjs"
+  },
   "exports": {
     ".": "./src/index.mjs",
     "./manifest": "./src/core/manifest.mjs",
     "./receipt": "./src/core/receipt.mjs",
+    "./mcp": "./src/mcp/server.mjs",
     "./version": "./src/version.mjs",
     "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
     "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json"
@@ -19,10 +23,14 @@
     "check": "node scripts/validate-project.mjs",
     "check:package": "node scripts/validate-package.mjs",
     "test": "node --test",
-    "test:browser": "node tests/browser-smoke.mjs",
+    "test:browser": "node tests/browser-smoke.mjs && node tests/mcp-browser-smoke.mjs",
     "ci": "npm run check && npm run check:package && npm test"
   },
-  "dependencies": { "playwright": "1.56.1" },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "playwright": "1.56.1",
+    "zod": "4.4.3"
+  },
   "keywords": ["playwright", "visual-testing", "browser-automation", "mcp", "coding-agents"],
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/teamleaderleo/renderprove.git" },

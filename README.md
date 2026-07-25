@@ -10,7 +10,7 @@ Renderprove sees and verifies it.
 Stensibly records what happened.
 ```
 
-Renderprove is early-stage software. The first release focuses on one auditable local CLI and receipt contract rather than a general browser-agent language.
+Renderprove is early-stage software. It focuses on one auditable CLI, receipt contract, and bounded agent interface rather than a general browser-agent language.
 
 ## First review
 
@@ -25,6 +25,23 @@ npx renderprove review
 ```
 
 The review exits with `0` when every case passes, `1` when browser evidence violates the declared policy, and `2` for configuration or execution failures.
+
+## Local MCP
+
+A local coding agent can call the same implementation through stdio:
+
+```bash
+renderprove-mcp --root /Users/you/Projects
+```
+
+The MCP server exposes only:
+
+- `inspect_project`
+- `review_project`
+
+The operator chooses the root when the process starts. Tool arguments may only select real project and manifest paths beneath it. Responses omit runtime commands, environment values, raw logs, stack traces, and absolute worker paths. Reviews remain headless and return the existing sanitized receipt rather than raw Chrome control.
+
+See [local stdio MCP](docs/MCP.md) for client configuration and the full trust boundary.
 
 ## Manifest
 
@@ -81,20 +98,21 @@ Included now:
 - collision-resistant artifact names and safe output paths
 - strict versioned JSON manifests and receipts
 - Playwright Chromium receipts
-- locked core, package, executable, and browser CI
+- bounded local stdio MCP tools
+- locked core, package, executable, MCP, and browser CI
 
 Planned after this contract proves useful:
 
 - interaction steps with a deliberately small vocabulary
 - baseline comparison and visual-difference evidence
-- local stdio and remote HTTP MCP
+- authenticated remote HTTP MCP
 - Stensibly artifact and work-item adapters
 - SmolRunner leased-preview execution
 - WebKit, Firefox, and native simulator workers
 
 ## Security
 
-Renderprove executes project commands and drives browsers. Read [SECURITY.md](SECURITY.md) before attaching it to a self-hosted runner or remote MCP endpoint.
+Renderprove executes project commands and drives browsers. Read [SECURITY.md](SECURITY.md) before attaching it to a self-hosted runner or MCP client.
 
 ## License
 

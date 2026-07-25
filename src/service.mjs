@@ -23,6 +23,7 @@ export async function reviewProject({ projectRoot = process.cwd(), manifestPath,
       outputRoot,
       headed,
       chromium,
+      signal,
     });
   } finally {
     await runtime.stop();
