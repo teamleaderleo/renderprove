@@ -22,6 +22,20 @@ async function requireDirectory(candidate, label) {
   return realPath;
 }
 
+async function existingRealAncestor(candidate) {
+  let cursor = path.resolve(candidate);
+  while (true) {
+    try {
+      return await fs.realpath(cursor);
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error;
+      const parent = path.dirname(cursor);
+      if (parent === cursor) throw error;
+      cursor = parent;
+    }
+  }
+}
+
 export async function resolveOperatorRoot(root) {
   if (typeof root !== 'string' || root.trim().length === 0) {
     throw new RenderproveError('MCP root must be a non-empty path.', { code: 'INVALID_MCP_ROOT' });
@@ -54,8 +68,10 @@ export async function resolveMcpProject(operatorRoot, project = '.') {
 export async function resolveMcpManifest(projectRoot, manifestPath) {
   const lexicalManifest = await findManifest(projectRoot, manifestPath);
   let realManifest;
+  let stats;
   try {
     realManifest = await fs.realpath(lexicalManifest);
+    stats = await fs.stat(realManifest);
   } catch (cause) {
     throw new RenderproveError('Manifest does not exist or cannot be read.', {
       code: 'MCP_MANIFEST_UNAVAILABLE',
@@ -67,5 +83,45 @@ export async function resolveMcpManifest(projectRoot, manifestPath) {
       code: 'MCP_MANIFEST_OUTSIDE_PROJECT',
     });
   }
+  if (!stats.isFile()) {
+    throw new RenderproveError('Manifest must be a regular file.', {
+      code: 'MCP_MANIFEST_NOT_FILE',
+    });
+  }
   return path.relative(projectRoot, realManifest) || path.basename(realManifest);
+}
+
+export async function assertMcpReviewPaths(manifest) {
+  if (manifest.runtime) {
+    const runtimeCwd = await requireDirectory(
+      path.resolve(manifest.projectRoot, manifest.runtime.cwd),
+      'Runtime working directory',
+    );
+    if (isOutsideRoot(manifest.projectRoot, runtimeCwd)) {
+      throw new RenderproveError('Runtime working directory resolves outside the selected project.', {
+        code: 'MCP_RUNTIME_OUTSIDE_PROJECT',
+      });
+    }
+  }
+
+  const outputPath = path.resolve(manifest.projectRoot, manifest.review.outputDir);
+  if (isOutsideRoot(manifest.projectRoot, outputPath)) {
+    throw new RenderproveError('Evidence output must stay inside the selected project.', {
+      code: 'MCP_OUTPUT_OUTSIDE_PROJECT',
+    });
+  }
+  let realAncestor;
+  try {
+    realAncestor = await existingRealAncestor(outputPath);
+  } catch (cause) {
+    throw new RenderproveError('Evidence output cannot be resolved safely.', {
+      code: 'MCP_OUTPUT_UNAVAILABLE',
+      cause,
+    });
+  }
+  if (isOutsideRoot(manifest.projectRoot, realAncestor)) {
+    throw new RenderproveError('Evidence output resolves outside the selected project.', {
+      code: 'MCP_OUTPUT_OUTSIDE_PROJECT',
+    });
+  }
 }
