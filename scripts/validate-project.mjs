@@ -25,12 +25,14 @@ const required = [
   'src/mcp/results.mjs',
   'src/mcp/review-gate.mjs',
   'src/mcp/server.mjs',
+  'src/probe/enrollment.mjs',
   'src/probe/repeatability.mjs',
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'scripts/validate-package.mjs',
   'scripts/worker-identity.mjs',
+  'scripts/probe-paths.mjs',
   'scripts/probe-podman.sh',
   'scripts/probe-repeatability.sh',
   'scripts/repeatability-report.mjs',
@@ -42,6 +44,7 @@ const required = [
   'docs/SELF_HOSTED_PROBE.md',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',
+  'tests/probe-enrollment.test.mjs',
   'tests/repeatability.test.mjs'
 ];
 
@@ -53,7 +56,7 @@ for (const schema of ['interaction-plan-v1.schema.json', 'manifest-v1.schema.jso
   }
 }
 const packageJson = JSON.parse(await fs.readFile(new URL('../package.json', import.meta.url), 'utf8'));
-const packageLock = JSON.parse(await fs.readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
+const packageLock = JSON.parse(await fs.readFile(new URL('../package-lock.json'), 'utf8'));
 if (packageJson.name !== 'renderprove') throw new Error('package name must be renderprove');
 if (packageJson.version !== VERSION) throw new Error('package and CLI versions must match');
 if (packageLock.version !== VERSION || packageLock.packages['']?.version !== VERSION) {
