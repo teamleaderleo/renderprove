@@ -37,6 +37,14 @@ npm run probe:podman
 
 The probe disables outbound networking, applies CPU, memory, PID, capability, and temporary-filesystem limits, records Chromium, OS, architecture, Node, locale, timezone, image, and font identities, and writes evidence beneath `tests/fixtures/site/.renderprove-probe`.
 
+Run five fresh worker containers and require every screenshot digest to converge:
+
+```bash
+npm run probe:repeatability
+```
+
+The repeatability report records every worker fingerprint, receipt status, case set, and screenshot SHA-256 observation beneath `tests/fixtures/site/.renderprove-repeatability`. It exits with `1` when a receipt fails, the renderer identity changes, a case disappears, or screenshot bytes drift.
+
 The initial path is intended for the existing Lima Ubuntu lab VM. SmolRunner remains the eventual owner of runner lifecycle and disposable execution; Renderprove owns the browser review and receipt. See [self-hosted renderer probe](docs/SELF_HOSTED_PROBE.md).
 
 ## Local MCP
@@ -113,6 +121,7 @@ Included now:
 - Playwright Chromium receipts
 - bounded local stdio MCP tools
 - a pinned self-hosted Podman renderer probe for trusted revisions
+- repeated fresh-container screenshot convergence reports
 - locked core, package, executable, MCP, and browser CI
 
 Planned after this contract proves useful:
