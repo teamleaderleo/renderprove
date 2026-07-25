@@ -7,6 +7,10 @@ function relativeManifest(projectRoot, sourcePath) {
   return relative || path.basename(sourcePath);
 }
 
+function relativeProjectPath(projectRoot, candidate) {
+  return path.relative(projectRoot, path.resolve(projectRoot, candidate)) || '.';
+}
+
 function sanitizeDiagnostic(diagnostic) {
   const { stack: _stack, ...safe } = diagnostic;
   return safe;
@@ -40,7 +44,7 @@ export function sanitizeManifestForMcp(manifest, projectPath) {
         deviceScaleFactor,
       })),
       failOn: { ...manifest.review.failOn },
-      outputDir: manifest.review.outputDir,
+      outputDir: relativeProjectPath(manifest.projectRoot, manifest.review.outputDir),
       navigationTimeoutMs: manifest.review.navigationTimeoutMs,
     },
   };
