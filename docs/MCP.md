@@ -50,7 +50,7 @@ Runs the existing Renderprove review and returns a sanitized receipt.
 
 Arguments are identical to `inspect_project`. Reviews are always headless through MCP. A second review for the same real project path receives `MCP_PROJECT_BUSY` until the first review releases its claim.
 
-Clients should permit a longer tool timeout for browser reviews. The initial implementation completes within the tool call rather than creating a background task.
+Clients should permit a longer tool timeout for browser reviews. The initial implementation completes within the tool call rather than creating a background task. When the client cancels or times out the request, Renderprove closes the active page, browser context, browser, and local project process; it releases the project claim and skips receipt creation rather than recording cancellation as a failed review.
 
 ## Result envelope
 
@@ -87,6 +87,7 @@ The local server is for one trusted operator and trusted repository revisions.
 - Runtime working and evidence output paths are checked before browser execution.
 - Existing symlinked evidence directories cannot redirect writes outside the project.
 - Each browser review case still receives a fresh isolated browser context.
+- Cancellation propagates through the MCP request into browser and process cleanup.
 - stdout is reserved entirely for MCP JSON-RPC; operator errors use stderr.
 - Remote HTTP transport, authentication, shared tenancy, and arbitrary browser tools remain outside this release.
 
