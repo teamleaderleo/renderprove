@@ -20,9 +20,13 @@ const required = [
   'src/mcp/server.mjs',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
+  'build/worker/Containerfile',
+  'scripts/probe-podman.sh',
+  'scripts/worker-identity.mjs',
   'docs/ARCHITECTURE.md',
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
+  'docs/SELF_HOSTED_PROBE.md',
 ];
 for (const file of required) {
   if (!files.has(file)) throw new Error(`npm package is missing ${file}`);
