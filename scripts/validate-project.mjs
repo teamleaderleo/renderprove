@@ -56,7 +56,7 @@ for (const schema of ['interaction-plan-v1.schema.json', 'manifest-v1.schema.jso
   }
 }
 const packageJson = JSON.parse(await fs.readFile(new URL('../package.json', import.meta.url), 'utf8'));
-const packageLock = JSON.parse(await fs.readFile(new URL('../package-lock.json'), 'utf8'));
+const packageLock = JSON.parse(await fs.readFile(new URL('../package-lock.json', import.meta.url), 'utf8'));
 if (packageJson.name !== 'renderprove') throw new Error('package name must be renderprove');
 if (packageJson.version !== VERSION) throw new Error('package and CLI versions must match');
 if (packageLock.version !== VERSION || packageLock.packages['']?.version !== VERSION) {
