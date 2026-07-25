@@ -16,6 +16,7 @@
     "./receipt": "./src/core/receipt.mjs",
     "./mcp": "./src/mcp/server.mjs",
     "./version": "./src/version.mjs",
+    "./schema/advice-v1.schema.json": "./schema/advice-v1.schema.json",
     "./schema/interaction-plan-v1.schema.json": "./schema/interaction-plan-v1.schema.json",
     "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
     "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json"
