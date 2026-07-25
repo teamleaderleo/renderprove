@@ -119,17 +119,27 @@ function movementDefaults(durationMs, explicitSteps) {
   return { durationMs, steps };
 }
 
+function normalizeTimeout(value, fallback, label) {
+  return normalizeInteger(value, fallback, label, { min: 100, max: 30_000 });
+}
+
 function normalizeStep(input, index, defaultTimeoutMs) {
   const label = `steps[${index}]`;
   const value = assertObject(input, label);
   const id = normalizeId(value.id, `${label}.id`);
 
   if (value.type === 'pointerMove') {
-    assertKnownKeys(value, ['id', 'type', 'to', 'durationMs', 'steps'], label);
+    assertKnownKeys(value, ['id', 'type', 'to', 'durationMs', 'steps', 'timeoutMs'], label);
     const durationMs = normalizeInteger(value.durationMs, 0, `${label}.durationMs`, { min: 0, max: 5_000 });
     const movement = movementDefaults(durationMs, value.steps);
     movement.steps = normalizeInteger(movement.steps, undefined, `${label}.steps`, { min: 1, max: 120 });
-    return Object.freeze({ id, type: 'pointerMove', to: normalizeInteractionPoint(value.to, `${label}.to`), timeoutMs: defaultTimeoutMs, ...movement });
+    return Object.freeze({
+      id,
+      type: 'pointerMove',
+      to: normalizeInteractionPoint(value.to, `${label}.to`),
+      timeoutMs: normalizeTimeout(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`),
+      ...movement,
+    });
   }
 
   if (value.type === 'click') {
@@ -138,12 +148,12 @@ function normalizeStep(input, index, defaultTimeoutMs) {
       id,
       type: 'click',
       target: normalizeTarget(value.target, `${label}.target`),
-      timeoutMs: normalizeInteger(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`, { min: 100, max: 30_000 }),
+      timeoutMs: normalizeTimeout(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`),
     });
   }
 
   if (value.type === 'drag') {
-    assertKnownKeys(value, ['id', 'type', 'from', 'to', 'durationMs', 'steps'], label);
+    assertKnownKeys(value, ['id', 'type', 'from', 'to', 'durationMs', 'steps', 'timeoutMs'], label);
     const durationMs = normalizeInteger(value.durationMs, 250, `${label}.durationMs`, { min: 0, max: 5_000 });
     const movement = movementDefaults(durationMs, value.steps);
     movement.steps = normalizeInteger(movement.steps, undefined, `${label}.steps`, { min: 1, max: 120 });
@@ -152,7 +162,7 @@ function normalizeStep(input, index, defaultTimeoutMs) {
       type: 'drag',
       from: normalizeInteractionPoint(value.from, `${label}.from`),
       to: normalizeInteractionPoint(value.to, `${label}.to`),
-      timeoutMs: defaultTimeoutMs,
+      timeoutMs: normalizeTimeout(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`),
       ...movement,
     });
   }
@@ -167,7 +177,7 @@ function normalizeStep(input, index, defaultTimeoutMs) {
       target: normalizeInteractionLocator(value.target, `${label}.target`),
       text: normalizeString(value.text, `${label}.text`, { min: 0, max: 10_000 }),
       mode,
-      timeoutMs: normalizeInteger(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`, { min: 100, max: 30_000 }),
+      timeoutMs: normalizeTimeout(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`),
     });
   }
 
@@ -183,7 +193,7 @@ function normalizeStep(input, index, defaultTimeoutMs) {
       type: 'select',
       target: normalizeInteractionLocator(value.target, `${label}.target`),
       values: Object.freeze(values),
-      timeoutMs: normalizeInteger(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`, { min: 100, max: 30_000 }),
+      timeoutMs: normalizeTimeout(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`),
     });
   }
 
@@ -197,7 +207,7 @@ function normalizeStep(input, index, defaultTimeoutMs) {
       type: 'waitFor',
       target: normalizeInteractionLocator(value.target, `${label}.target`),
       state: value.state,
-      timeoutMs: normalizeInteger(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`, { min: 100, max: 30_000 }),
+      timeoutMs: normalizeTimeout(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`),
     });
   }
 
@@ -211,14 +221,14 @@ function normalizeStep(input, index, defaultTimeoutMs) {
   }
 
   if (value.type === 'capture') {
-    assertKnownKeys(value, ['id', 'type', 'name', 'fullPage', 'target'], label);
+    assertKnownKeys(value, ['id', 'type', 'name', 'fullPage', 'target', 'timeoutMs'], label);
     if (typeof value.fullPage !== 'undefined' && typeof value.fullPage !== 'boolean') fail(`${label}.fullPage must be a boolean.`);
     const step = {
       id,
       type: 'capture',
       name: normalizeId(value.name, `${label}.name`),
       fullPage: value.fullPage ?? true,
-      timeoutMs: defaultTimeoutMs,
+      timeoutMs: normalizeTimeout(value.timeoutMs, defaultTimeoutMs, `${label}.timeoutMs`),
     };
     if (typeof value.target !== 'undefined') step.target = normalizeInteractionLocator(value.target, `${label}.target`);
     return Object.freeze(step);
@@ -227,8 +237,24 @@ function normalizeStep(input, index, defaultTimeoutMs) {
   fail(`${label}.type is unsupported.`);
 }
 
+function pointResolutionBudget(point, timeoutMs) {
+  return point?.space === 'target' ? timeoutMs : 0;
+}
+
+function targetResolutionBudget(target, timeoutMs) {
+  if (!target) return 0;
+  return target.space ? pointResolutionBudget(target, timeoutMs) : timeoutMs;
+}
+
 function stepBudgetMs(step) {
-  if (step.type === 'wait' || step.type === 'pointerMove' || step.type === 'drag') return step.durationMs;
+  if (step.type === 'wait') return step.durationMs;
+  if (step.type === 'pointerMove') return step.durationMs + pointResolutionBudget(step.to, step.timeoutMs);
+  if (step.type === 'drag') {
+    return step.durationMs
+      + pointResolutionBudget(step.from, step.timeoutMs)
+      + pointResolutionBudget(step.to, step.timeoutMs);
+  }
+  if (step.type === 'click') return targetResolutionBudget(step.target, step.timeoutMs);
   return step.timeoutMs;
 }
 
@@ -239,7 +265,7 @@ export function normalizeInteractionPlan(input) {
   const defaults = value.defaults ?? {};
   assertObject(defaults, 'interaction plan.defaults');
   assertKnownKeys(defaults, ['timeoutMs'], 'interaction plan.defaults');
-  const timeoutMs = normalizeInteger(defaults.timeoutMs, DEFAULT_TIMEOUT_MS, 'interaction plan.defaults.timeoutMs', { min: 100, max: 30_000 });
+  const timeoutMs = normalizeTimeout(defaults.timeoutMs, DEFAULT_TIMEOUT_MS, 'interaction plan.defaults.timeoutMs');
   if (!Array.isArray(value.steps) || value.steps.length < 1 || value.steps.length > MAX_STEPS) {
     fail(`interaction plan.steps must contain between 1 and ${MAX_STEPS} steps.`);
   }
