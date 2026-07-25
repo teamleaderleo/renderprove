@@ -37,7 +37,7 @@ test('parses fenced and structured advisory JSON while bounding fields', () => {
   assert.deepEqual(structured, structuredAdvice);
 });
 
-test('calls the OpenAI-compatible Cloudflare endpoint with JSON Schema and without exposing credentials', async () => {
+test('calls the OpenAI-compatible Cloudflare endpoint with one forced advisory tool', async () => {
   const requests = [];
   const advice = await requestCloudflareAdvice({
     bundle,
@@ -48,7 +48,19 @@ test('calls the OpenAI-compatible Cloudflare endpoint with JSON Schema and witho
       return new Response(JSON.stringify({
         id: 'chatcmpl-test',
         model: '@cf/google/gemma-4-26b-a4b-it',
-        choices: [{ message: { parsed: structuredAdvice, content: '' } }],
+        choices: [{
+          message: {
+            content: null,
+            tool_calls: [{
+              id: 'call-test',
+              type: 'function',
+              function: {
+                name: 'report_advice',
+                arguments: JSON.stringify(structuredAdvice),
+              },
+            }],
+          },
+        }],
         usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
       }), { status: 200, headers: { 'content-type': 'application/json' } });
     },
@@ -60,16 +72,35 @@ test('calls the OpenAI-compatible Cloudflare endpoint with JSON Schema and witho
   assert.equal(requests[0].body.seed, 17);
   assert.equal(requests[0].body.max_completion_tokens, 4096);
   assert.equal(requests[0].body.model, '@cf/google/gemma-4-26b-a4b-it');
-  assert.deepEqual(requests[0].body.response_format, {
-    type: 'json_schema',
-    json_schema: ADVISORY_RESPONSE_SCHEMA,
-  });
+  assert.equal(requests[0].body.tool_choice, 'required');
+  assert.equal(requests[0].body.parallel_tool_calls, false);
+  assert.deepEqual(requests[0].body.tools, [{
+    type: 'function',
+    function: {
+      name: 'report_advice',
+      description: 'Return the final bounded, non-authoritative Renderprove advisory assessment.',
+      parameters: ADVISORY_RESPONSE_SCHEMA,
+    },
+  }]);
+  assert.equal('response_format' in requests[0].body, false);
   assert.equal(advice.authoritative, false);
   assert.equal(advice.verdict, 'clear');
   assert.deepEqual(advice.usage, { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 });
   assert.doesNotMatch(JSON.stringify(advice), /very-secret-api-token/);
   assert.equal(advice.input.files[0].content, undefined);
   assert.equal(advice.generation.maxCompletionTokens, 4096);
+});
+
+test('accepts Workers AI binding-style tool arguments as a compatibility fallback', async () => {
+  const advice = await requestCloudflareAdvice({
+    bundle,
+    accountId: 'account_123',
+    apiToken: 'very-secret-api-token',
+    fetchImpl: async () => new Response(JSON.stringify({
+      tool_calls: [{ name: 'report_advice', arguments: structuredAdvice }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }),
+  });
+  assert.equal(advice.verdict, 'clear');
 });
 
 test('returns sanitized provider errors', async () => {
@@ -84,13 +115,13 @@ test('returns sanitized provider errors', async () => {
   }), /HTTP 401/);
 });
 
-test('rejects malformed model output when structured output is unavailable', async () => {
+test('rejects a response with neither advisory tool arguments nor JSON', async () => {
   await assert.rejects(() => requestCloudflareAdvice({
     bundle,
     accountId: 'account_123',
     apiToken: 'very-secret-api-token',
     fetchImpl: async () => new Response(JSON.stringify({
-      choices: [{ message: { content: 'I decline to emit JSON.' } }],
+      choices: [{ message: { content: 'I decline to call the tool.' } }],
     }), { status: 200, headers: { 'content-type': 'application/json' } }),
-  }), /no JSON object/);
+  }), /no advisory tool arguments/);
 });
