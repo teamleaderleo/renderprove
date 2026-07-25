@@ -254,7 +254,10 @@ function stepBudgetMs(step) {
       + pointResolutionBudget(step.from, step.timeoutMs)
       + pointResolutionBudget(step.to, step.timeoutMs);
   }
-  if (step.type === 'click') return targetResolutionBudget(step.target, step.timeoutMs);
+  if (step.type === 'click') {
+    const resolutionMs = targetResolutionBudget(step.target, step.timeoutMs);
+    return resolutionMs + (step.target.space ? 0 : step.timeoutMs);
+  }
   return step.timeoutMs;
 }
 
