@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { inspectProject, reviewProject } from '../service.mjs';
 import { VERSION } from '../version.mjs';
 import {
+  assertMcpReviewPaths,
   resolveMcpManifest,
   resolveMcpProject,
   resolveOperatorRoot,
@@ -98,6 +99,11 @@ export async function createRenderproveMcpServer({
       try {
         const resolved = await resolveMcpProject(operatorRoot, project);
         const manifestPath = await resolveMcpManifest(resolved.projectRoot, manifest);
+        const normalized = await inspect({
+          projectRoot: resolved.projectRoot,
+          manifestPath,
+        });
+        await assertMcpReviewPaths(normalized);
         releaseReview = reviewGate.claim(resolved.projectRoot);
         const { receipt } = await review({
           projectRoot: resolved.projectRoot,
