@@ -19,13 +19,26 @@
     "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
     "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json"
   },
-  "files": ["bin", "src", "schema", "docs", "README.md", "SECURITY.md", "LICENSE"],
+  "files": [
+    "bin",
+    "src",
+    "schema",
+    "docs",
+    "build/worker/Containerfile",
+    "scripts/probe-podman.sh",
+    "scripts/worker-identity.mjs",
+    "README.md",
+    "SECURITY.md",
+    "LICENSE"
+  ],
   "engines": { "node": ">=22" },
   "scripts": {
     "check": "node scripts/validate-project.mjs",
     "check:package": "node scripts/validate-package.mjs",
     "test": "node --test",
     "test:browser": "node tests/browser-smoke.mjs && node tests/mcp-browser-smoke.mjs && node tests/interaction-browser-smoke.mjs",
+    "worker:identity": "node scripts/worker-identity.mjs",
+    "probe:podman": "bash scripts/probe-podman.sh",
     "ci": "npm run check && npm run check:package && npm test"
   },
   "dependencies": {
