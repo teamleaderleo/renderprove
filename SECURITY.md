@@ -6,7 +6,7 @@ Renderprove is pre-1.0. Security fixes apply to the latest commit on `main` unti
 
 ## Reporting
 
-Report vulnerabilities privately through GitHub's security advisory interface. Avoid public issues for credential exposure, command execution, path traversal, browser-profile leakage, or worker-isolation failures.
+Report vulnerabilities privately through GitHub's security advisory interface. Avoid public issues for credential exposure, command execution, path traversal, browser-profile leakage, MCP root escapes, or worker-isolation failures.
 
 ## Operator guidance
 
@@ -17,8 +17,12 @@ Renderprove executes repository-declared commands. Treat a review request as cod
 - Use dedicated unprivileged accounts or isolated containers.
 - Keep browser profiles ephemeral.
 - Never expose a browser debugging port publicly.
-- Put remote MCP behind authentication, narrow project scopes, and origin allowlists.
+- Choose the narrowest practical root for `renderprove-mcp`.
+- Review MCP client configuration before approving the local server.
+- Put future remote MCP behind authentication, narrow project scopes, origin allowlists, and explicit tenancy controls.
 - Keep production mutation outside review credentials.
 - Retain screenshots and traces only as long as needed.
+
+The stdio MCP server resolves its configured root and selected projects through real paths, rejects project and manifest escapes, checks runtime and evidence paths, and excludes raw host paths, commands, environment values, logs, and stacks from tool responses. These controls reduce accidental exposure; they do not sandbox the repository runtime.
 
 The initial release is designed for a single trusted operator. It is not a hostile multi-tenant sandbox.
