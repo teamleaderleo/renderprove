@@ -47,15 +47,27 @@ tests/fixtures/site/.renderprove-probe/
   screenshots/
 ```
 
-To review another project already prepared inside the Renderprove checkout:
+## Enrol another checkout
+
+The default enrolment root is the Renderprove checkout itself. Select one explicit parent directory when reviewing sibling repositories:
 
 ```bash
-bash scripts/probe-podman.sh path/to/project
+RENDERPROVE_ENROLLED_ROOT=/home/lima/projects \
+  npm run probe:podman -- emoji-mood-tracker-basic
 ```
 
-The project must contain `renderprove.json` or `.renderprove.json`. Its runtime command must work with the dependencies already present in that project directory. Dependency installation and production builds remain repository-owned preparation steps.
+Absolute project paths are also accepted when their real path remains beneath the selected root:
 
-`RENDERPROVE_PROBE_OUTPUT` selects another project-relative evidence directory. `RENDERPROVE_PROBE_BUILD=0` reuses the previously built image. Both settings are validated before execution.
+```bash
+RENDERPROVE_ENROLLED_ROOT=/home/lima/projects \
+  npm run probe:repeatability -- /home/lima/projects/emoji-mood-tracker-basic
+```
+
+The resolver applies lexical and real-path containment to the enrolment root, project, and evidence directory. Project symlinks that leave the selected root fail. Existing evidence symlinks that leave the project fail before cleanup. Relative enrolment roots resolve from the Renderprove checkout.
+
+The project must contain `renderprove.json` or `.renderprove.json`. Its runtime command must work with dependencies and build output already present in that project directory. Dependency installation and production builds remain repository-owned preparation steps.
+
+`RENDERPROVE_PROBE_OUTPUT` selects another project-relative evidence directory. `RENDERPROVE_PROBE_BUILD=0` reuses the previously built image. Both settings use the same path authority as the repeatability probe.
 
 ## Prove repeated convergence
 
