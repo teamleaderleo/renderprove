@@ -4,6 +4,8 @@ import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { runBrowserReview } from '../src/browser/review.mjs';
+import { normalizeManifest } from '../src/core/manifest.mjs';
+import { startRuntime } from '../src/runtime/process.mjs';
 import { reviewProject } from '../src/service.mjs';
 
 const reviewConfig = {
@@ -36,6 +38,35 @@ test('pre-aborted browser reviews reject before launching Chromium', async () =>
     (error) => error.code === 'REVIEW_CANCELLED',
   );
   assert.equal(launched, false);
+});
+
+test('cancellation during runtime readiness terminates startup consistently', async () => {
+  const projectRoot = await fs.mkdtemp(path.join(os.tmpdir(), 'renderprove-runtime-cancel-'));
+  const manifest = normalizeManifest({
+    version: 1,
+    project: 'runtime-cancel-fixture',
+    runtime: {
+      command: [process.execPath, '-e', 'setInterval(() => {}, 1000)'],
+      port: 46843,
+      readyPath: '/health',
+      timeoutMs: 30_000,
+      shutdownMs: 250,
+    },
+    review: { routes: ['/'] },
+  }, { projectRoot });
+  const controller = new AbortController();
+  const startedAt = Date.now();
+  const timer = setTimeout(() => controller.abort(new Error('cancel readiness')), 100);
+  try {
+    await assert.rejects(
+      startRuntime(manifest, { signal: controller.signal }),
+      (error) => error.code === 'REVIEW_CANCELLED',
+    );
+    assert.ok(Date.now() - startedAt < 5_000);
+  } finally {
+    clearTimeout(timer);
+    await fs.rm(projectRoot, { recursive: true, force: true });
+  }
 });
 
 test('cancellation closes page, context, browser, runtime path, and skips the receipt', async () => {
