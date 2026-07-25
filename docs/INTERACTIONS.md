@@ -65,7 +65,7 @@ Points use normalised coordinates between `0` and `1`:
 }
 ```
 
-This keeps pointer recipes usable across viewport sizes and responsive layouts.
+The complete range maps to interior pixel centres. `0` sits half a pixel inside the near edge and `1` sits half a pixel inside the far edge. Both accepted endpoints remain inside the viewport or target box while recipes stay portable across responsive layouts.
 
 ## Bounds and privacy
 
@@ -79,7 +79,11 @@ The validator enforces:
 - finite normalised pointer coordinates
 - strict known-field checking
 
-Results include step IDs, types, timing, status, and coarse action metadata. Filled text, selectors, labels, option values, locator names, and raw failure messages are excluded from successful result details and bounded failure metadata.
+Locator clicks use one deadline across visibility resolution, scrolling, bounding-box resolution, and the click action. Target-relative drag endpoints retain separate declared resolution budgets because each target can require its own visibility and scrolling work.
+
+Successful results include step IDs, types, timing, status, and coarse action metadata. Filled text, selectors, labels, option values, and locator names are excluded.
+
+A failed step exposes a stable allowlisted `failureCode` when the executor can classify it, or `INTERACTION_OPERATION_FAILED` for an unclassified browser or callback error. Raw Playwright errors and callback causes are discarded from the public failure. The bounded metadata contains only plan and step identity, step type and index, completed-step count, and the failure code.
 
 Cancellation propagates through waits, movement, drag cleanup, and capture callbacks. A failed or cancelled drag attempts to release the left mouse button. Capture handlers receive a signal combining caller cancellation and the step timeout.
 
