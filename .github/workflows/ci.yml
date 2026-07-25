@@ -50,3 +50,56 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           include-hidden-files: true
+
+  worker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Build worker image
+        run: |
+          playwright_version="$(node -p "require('./package.json').dependencies.playwright")"
+          docker build \
+            --build-arg "PLAYWRIGHT_VERSION=${playwright_version}" \
+            --file build/worker/Containerfile \
+            --tag renderprove-worker:test \
+            .
+      - name: Record worker identity
+        run: |
+          mkdir -p test-results/worker
+          image_id="$(docker image inspect --format '{{.Id}}' renderprove-worker:test)"
+          docker run --rm --init --ipc=host --network=none \
+            --cap-drop=ALL --security-opt no-new-privileges \
+            --pids-limit=768 --memory=2g --cpus=2 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+            --entrypoint node \
+            --env RENDERPROVE_WORKER_IMAGE=renderprove-worker:test \
+            --env "RENDERPROVE_WORKER_IMAGE_ID=${image_id}" \
+            renderprove-worker:test \
+            /opt/renderprove/scripts/worker-identity.mjs \
+            > test-results/worker/worker.json
+          node -e "const value=require('./test-results/worker/worker.json'); if (value.version !== 1 || value.browser?.name !== 'chromium' || !value.fonts?.sha256) process.exit(1)"
+      - name: Review fixture in worker
+        run: |
+          rm -rf tests/fixtures/site/.worker-proof
+          docker run --rm --init --ipc=host --network=none \
+            --cap-drop=ALL --security-opt no-new-privileges \
+            --pids-limit=768 --memory=2g --cpus=2 \
+            --tmpfs /tmp:rw,nosuid,nodev,size=1g \
+            --volume "${GITHUB_WORKSPACE}/tests/fixtures/site:/workspace/project:rw" \
+            renderprove-worker:test \
+            review /workspace/project --output .worker-proof --json \
+            > test-results/worker/review.stdout.json
+          node -e "const value=require('./tests/fixtures/site/.worker-proof/receipt.json'); if (value.status !== 'passed' || value.cases?.length !== 2) process.exit(1)"
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: renderprove-worker-probe
+          path: |
+            test-results/worker
+            tests/fixtures/site/.worker-proof
+          if-no-files-found: error
+          retention-days: 7
+          include-hidden-files: true
