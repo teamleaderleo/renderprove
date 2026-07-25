@@ -20,7 +20,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - run: npm ci --ignore-scripts
+      - run: npm install --ignore-scripts
       - run: npm run check
       - run: npm run check:package
       - run: mkdir -p test-results && node --test --test-reporter=spec 2>&1 | tee test-results/core.txt
@@ -31,6 +31,12 @@ jobs:
           path: test-results/core.txt
           if-no-files-found: error
           retention-days: 7
+      - uses: actions/upload-artifact@v4
+        with:
+          name: renderprove-package-lock
+          path: package-lock.json
+          if-no-files-found: error
+          retention-days: 1
 
   browser:
     runs-on: ubuntu-latest
@@ -39,7 +45,7 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 22
-      - run: npm ci --ignore-scripts
+      - run: npm install --ignore-scripts
       - run: npx playwright install --with-deps chromium
       - run: npm run test:browser
       - if: always()
