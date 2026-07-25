@@ -4,7 +4,10 @@
   "description": "Browser evidence for software projects and coding agents.",
   "type": "module",
   "sideEffects": false,
-  "bin": { "renderprove": "./bin/renderprove.mjs" },
+  "bin": {
+    "renderprove": "./bin/renderprove.mjs",
+    "renderprove-mcp": "./bin/renderprove-mcp.mjs"
+  },
   "exports": {
     ".": "./src/index.mjs",
     "./manifest": "./src/core/manifest.mjs",
