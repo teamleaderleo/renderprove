@@ -51,6 +51,13 @@ function remainingMs(deadline, label, timeoutMs) {
   return remaining;
 }
 
+function interiorCoordinate(origin, size, ratio) {
+  const inset = Math.min(0.5, size / 2);
+  const start = origin + inset;
+  const end = origin + size - inset;
+  return start + ((end - start) * ratio);
+}
+
 async function resolveLocatorPoint(page, target, xRatio, yRatio, timeoutMs, deadline = Date.now() + timeoutMs) {
   const locator = createLocator(page, target);
   await locator.waitFor({ state: 'visible', timeout: remainingMs(deadline, 'Interaction target resolution', timeoutMs) });
@@ -64,8 +71,8 @@ async function resolveLocatorPoint(page, target, xRatio, yRatio, timeoutMs, dead
   return {
     locator,
     point: {
-      x: box.x + (box.width * xRatio),
-      y: box.y + (box.height * yRatio),
+      x: interiorCoordinate(box.x, box.width, xRatio),
+      y: interiorCoordinate(box.y, box.height, yRatio),
     },
   };
 }
@@ -80,7 +87,10 @@ async function resolvePoint(page, point, timeoutMs) {
     }
     return {
       locator: null,
-      point: { x: viewport.width * point.x, y: viewport.height * point.y },
+      point: {
+        x: interiorCoordinate(0, viewport.width, point.x),
+        y: interiorCoordinate(0, viewport.height, point.y),
+      },
     };
   }
   return resolveLocatorPoint(page, point.target, point.x, point.y, timeoutMs);
