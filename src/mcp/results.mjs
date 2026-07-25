@@ -59,7 +59,9 @@ export function toolSuccess(value, summary) {
 }
 
 export function toolFailure(error) {
-  const code = error instanceof RenderproveError ? error.code : 'MCP_OPERATION_FAILED';
+  const code = error instanceof RenderproveError && error.code
+    ? error.code
+    : 'MCP_OPERATION_FAILED';
   const messages = {
     INVALID_MCP_ROOT: 'The configured MCP root is invalid.',
     MCP_PATH_UNAVAILABLE: 'The selected path does not exist or cannot be read.',
@@ -68,6 +70,10 @@ export function toolFailure(error) {
     MCP_PROJECT_OUTSIDE_ROOT: 'The project must stay inside the configured MCP root.',
     MCP_MANIFEST_UNAVAILABLE: 'The manifest does not exist or cannot be read.',
     MCP_MANIFEST_OUTSIDE_PROJECT: 'The manifest must stay inside the selected project.',
+    MCP_MANIFEST_NOT_FILE: 'The manifest must be a regular file.',
+    MCP_RUNTIME_OUTSIDE_PROJECT: 'The runtime working directory must stay inside the selected project.',
+    MCP_OUTPUT_OUTSIDE_PROJECT: 'The evidence output directory must stay inside the selected project.',
+    MCP_OUTPUT_UNAVAILABLE: 'The evidence output directory cannot be resolved safely.',
     MCP_PROJECT_BUSY: 'A review is already running for this project.',
     MANIFEST_NOT_FOUND: 'No Renderprove manifest was found in the selected project.',
     INVALID_MANIFEST_JSON: 'The Renderprove manifest is not valid JSON.',
