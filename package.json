@@ -10,6 +10,7 @@
   },
   "exports": {
     ".": "./src/index.mjs",
+    "./advice": "./src/advice.mjs",
     "./interaction": "./src/interaction.mjs",
     "./manifest": "./src/core/manifest.mjs",
     "./receipt": "./src/core/receipt.mjs",
@@ -50,7 +51,7 @@
     "playwright": "1.56.1",
     "zod": "4.4.3"
   },
-  "keywords": ["playwright", "visual-testing", "browser-automation", "mcp", "coding-agents"],
+  "keywords": ["playwright", "visual-testing", "browser-automation", "mcp", "coding-agents", "workers-ai", "gemma"],
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/teamleaderleo/renderprove.git" },
   "bugs": { "url": "https://github.com/teamleaderleo/renderprove/issues" },
