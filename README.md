@@ -26,6 +26,19 @@ npx renderprove review
 
 The review exits with `0` when every case passes, `1` when browser evidence violates the declared policy, and `2` for configuration or execution failures.
 
+## Self-hosted renderer probe
+
+A trusted Linux checkout can build a pinned Playwright worker image and run the fixture review inside a disposable rootless Podman container:
+
+```bash
+npm ci --ignore-scripts
+npm run probe:podman
+```
+
+The probe disables outbound networking, applies CPU, memory, PID, capability, and temporary-filesystem limits, records Chromium, OS, architecture, Node, locale, timezone, image, and font identities, and writes evidence beneath `tests/fixtures/site/.renderprove-probe`.
+
+The initial path is intended for the existing Lima Ubuntu lab VM. SmolRunner remains the eventual owner of runner lifecycle and disposable execution; Renderprove owns the browser review and receipt. See [self-hosted renderer probe](docs/SELF_HOSTED_PROBE.md).
+
 ## Local MCP
 
 A local coding agent can call the same implementation through stdio:
@@ -51,6 +64,8 @@ The public `renderprove/interaction` API validates and runs a deliberately small
 - click, fill, select, wait, and wait-for-state
 - page or element capture through a caller-supplied evidence handler
 - cancellation, time budgets, drag cleanup, and privacy-filtered results
+
+Normalised pointer endpoints remain inside the target or viewport pixel bounds. Locator resolution and a locator click share one declared deadline. Failed steps expose an allowlisted failure code and bounded step metadata without raw Playwright causes, selectors, labels, option values, or filled text.
 
 It excludes arbitrary JavaScript, shell commands, raw Playwright access, file upload, clipboard access, and unrestricted keyboard control. Interaction plans remain standalone in this release; manifest v1 and receipt v1 stay unchanged.
 
@@ -112,8 +127,9 @@ Included now:
 - strict versioned JSON manifests and receipts
 - Playwright Chromium receipts
 - bounded local stdio MCP tools
+- a pinned self-hosted Podman renderer probe for trusted revisions
 - standalone bounded interaction-plan validation and execution
-- locked core, package, executable, MCP, interaction, and browser CI
+- locked core, package, executable, MCP, interaction, worker, and browser CI
 
 Planned after this contract proves useful:
 
