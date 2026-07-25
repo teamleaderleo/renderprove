@@ -9,6 +9,13 @@ function cancellationError(signal) {
   });
 }
 
+function timeoutError(label, timeoutMs) {
+  return new RenderproveError(`${label} exceeded ${timeoutMs} ms.`, {
+    code: 'INTERACTION_TIMEOUT',
+    details: { timeoutMs },
+  });
+}
+
 function throwIfAborted(signal) {
   if (signal?.aborted) throw cancellationError(signal);
 }
@@ -29,10 +36,17 @@ function createLocator(page, target) {
   throw new RenderproveError(`Unsupported locator type ${target.by}.`, { code: 'INTERACTION_LOCATOR_UNSUPPORTED' });
 }
 
+function remainingMs(deadline, label) {
+  const remaining = deadline - Date.now();
+  if (remaining <= 0) throw timeoutError(label, 0);
+  return remaining;
+}
+
 async function resolveLocatorPoint(page, target, xRatio, yRatio, timeoutMs) {
   const locator = createLocator(page, target);
-  await locator.waitFor({ state: 'visible', timeout: timeoutMs });
-  await locator.scrollIntoViewIfNeeded({ timeout: timeoutMs });
+  const deadline = Date.now() + timeoutMs;
+  await locator.waitFor({ state: 'visible', timeout: remainingMs(deadline, 'Interaction target resolution') });
+  await locator.scrollIntoViewIfNeeded({ timeout: remainingMs(deadline, 'Interaction target resolution') });
   const box = await locator.boundingBox();
   if (!box || box.width <= 0 || box.height <= 0) {
     throw new RenderproveError('Interaction target does not have a visible bounding box.', {
@@ -62,6 +76,23 @@ async function resolvePoint(page, point, timeoutMs) {
     };
   }
   return resolveLocatorPoint(page, point.target, point.x, point.y, timeoutMs);
+}
+
+async function raceWithAbortAndTimeout(operation, {
+  signal,
+  timeoutMs,
+  label,
+}) {
+  throwIfAborted(signal);
+  const timeoutSignal = AbortSignal.timeout(timeoutMs);
+  const combinedSignal = signal ? AbortSignal.any([signal, timeoutSignal]) : timeoutSignal;
+  const aborted = new Promise((resolve, reject) => {
+    combinedSignal.addEventListener('abort', () => {
+      if (signal?.aborted) reject(cancellationError(signal));
+      else reject(timeoutError(label, timeoutMs));
+    }, { once: true });
+  });
+  return Promise.race([operation(combinedSignal), aborted]);
 }
 
 async function waitDuration(page, durationMs, signal) {
@@ -197,14 +228,17 @@ async function executeStep(page, step, pointerState, { capture, signal }) {
       });
     }
     const locator = step.target ? createLocator(page, step.target) : null;
-    await capture({
-      page,
-      locator,
-      name: step.name,
-      fullPage: step.fullPage,
-      timeoutMs: step.timeoutMs,
-      signal,
-    });
+    await raceWithAbortAndTimeout(
+      (captureSignal) => capture({
+        page,
+        locator,
+        name: step.name,
+        fullPage: step.fullPage,
+        timeoutMs: step.timeoutMs,
+        signal: captureSignal,
+      }),
+      { signal, timeoutMs: step.timeoutMs, label: `Capture ${step.name}` },
+    );
     return { name: step.name, target: step.target?.by ?? 'page', fullPage: step.fullPage };
   }
 
