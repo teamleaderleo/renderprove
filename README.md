@@ -10,7 +10,7 @@ Renderprove sees and verifies it.
 Stensibly records what happened.
 ```
 
-Renderprove is early-stage software. It focuses on one auditable CLI, receipt contract, and bounded agent interface rather than a general browser-agent language.
+Renderprove is early-stage software. It focuses on one auditable CLI, receipt contract, bounded interaction engine, and bounded agent interface rather than a general browser-agent language.
 
 ## First review
 
@@ -42,6 +42,19 @@ The MCP server exposes only:
 The operator chooses the root when the process starts. Tool arguments may only select real project and manifest paths beneath it. Responses omit runtime commands, environment values, raw logs, stack traces, and absolute worker paths. Reviews remain headless and return the existing sanitized receipt rather than raw Chrome control.
 
 See [local stdio MCP](docs/MCP.md) for client configuration and the full trust boundary.
+
+## Bounded interactions
+
+The public `renderprove/interaction` API validates and runs a deliberately small browser-action vocabulary:
+
+- pointer movement and drag paths using normalised coordinates
+- click, fill, select, wait, and wait-for-state
+- page or element capture through a caller-supplied evidence handler
+- cancellation, time budgets, drag cleanup, and privacy-filtered results
+
+It excludes arbitrary JavaScript, shell commands, raw Playwright access, file upload, clipboard access, and unrestricted keyboard control. Interaction plans remain standalone in this release; manifest v1 and receipt v1 stay unchanged.
+
+See [interaction plans](docs/INTERACTIONS.md) and the [interaction-plan v1 schema](schema/interaction-plan-v1.schema.json).
 
 ## Manifest
 
@@ -99,11 +112,12 @@ Included now:
 - strict versioned JSON manifests and receipts
 - Playwright Chromium receipts
 - bounded local stdio MCP tools
-- locked core, package, executable, MCP, and browser CI
+- standalone bounded interaction-plan validation and execution
+- locked core, package, executable, MCP, interaction, and browser CI
 
 Planned after this contract proves useful:
 
-- interaction steps with a deliberately small vocabulary
+- attach interaction results and captures to a new evidence contract
 - baseline comparison and visual-difference evidence
 - authenticated remote HTTP MCP
 - Stensibly artifact and work-item adapters
