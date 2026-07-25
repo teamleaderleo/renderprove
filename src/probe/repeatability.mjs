@@ -29,6 +29,22 @@ function caseLocator(reviewCase) {
   };
 }
 
+function validateCases(run) {
+  if (!Array.isArray(run.receipt.cases) || run.receipt.cases.length === 0) {
+    throw new TypeError(`run ${run.name} receipt requires at least one case`);
+  }
+  const ids = new Set();
+  for (const reviewCase of run.receipt.cases) {
+    if (!reviewCase || typeof reviewCase.id !== 'string' || reviewCase.id.length === 0) {
+      throw new TypeError(`run ${run.name} contains a case without an id`);
+    }
+    if (ids.has(reviewCase.id)) {
+      throw new TypeError(`run ${run.name} contains duplicate case id: ${reviewCase.id}`);
+    }
+    ids.add(reviewCase.id);
+  }
+}
+
 export function buildRepeatabilityReport(runs) {
   if (!Array.isArray(runs) || runs.length < 2) {
     throw new TypeError('repeatability requires at least two runs');
@@ -42,7 +58,7 @@ export function buildRepeatabilityReport(runs) {
     if (names.has(run.name)) throw new TypeError(`duplicate repeatability run name: ${run.name}`);
     names.add(run.name);
     if (!run.worker || !run.receipt) throw new TypeError(`run ${run.name} requires worker and receipt data`);
-    if (!Array.isArray(run.receipt.cases)) throw new TypeError(`run ${run.name} receipt requires cases`);
+    validateCases(run);
   }
 
   const workerRuns = runs.map((run) => ({ run: run.name, sha256: digestJson(run.worker) }));
