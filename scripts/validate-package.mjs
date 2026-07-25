@@ -21,11 +21,14 @@ const required = [
   'src/browser/interaction-plan.mjs',
   'src/browser/interaction-executor.mjs',
   'src/mcp/server.mjs',
+  'src/probe/repeatability.mjs',
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'build/worker/Containerfile',
   'scripts/probe-podman.sh',
+  'scripts/probe-repeatability.sh',
+  'scripts/repeatability-report.mjs',
   'scripts/worker-identity.mjs',
   'docs/ARCHITECTURE.md',
   'docs/INTERACTIONS.md',
@@ -41,6 +44,7 @@ for (const privatePath of [
   'tests/mcp.test.mjs',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',
+  'tests/repeatability.test.mjs',
   '.github/workflows/ci.yml',
 ]) {
   if (files.has(privatePath)) throw new Error(`npm package unexpectedly includes ${privatePath}`);
