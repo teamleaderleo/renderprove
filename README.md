@@ -79,6 +79,24 @@ It excludes arbitrary JavaScript, shell commands, raw Playwright access, file up
 
 See [interaction plans](docs/INTERACTIONS.md) and the [interaction-plan v1 schema](schema/interaction-plan-v1.schema.json).
 
+## Optional Gemma advisory
+
+Cloudflare Workers AI can provide a cheap secondary review over the latest receipt and a bounded set of project files:
+
+```bash
+npx renderprove advise --dry-run
+
+export CLOUDFLARE_ACCOUNT_ID='your-account-id'
+export CLOUDFLARE_API_TOKEN='your-workers-ai-token'
+npx renderprove advise
+```
+
+The default model is `@cf/google/gemma-4-26b-a4b-it`. Renderprove auto-selects common source and configuration files, skips dependencies and build output, rejects path escapes, redacts common secret patterns, and caps the transmitted file and byte counts. Repeated `--include` options can focus a monorepo.
+
+The result is written to `.renderprove/advice.json`, follows [advice v1](schema/advice-v1.schema.json), and always declares `authoritative: false`. AI output does not change the deterministic browser-review status or exit code. Use `--dry-run --json` to inspect the exact sanitized bundle before transfer.
+
+See [optional AI advisory review](docs/AI_ADVISORY.md) for CI setup, data-egress guidance, limits, pricing notes, and the full contract.
+
 ## Manifest
 
 Renderprove reads `renderprove.json` or `.renderprove.json` from the project root.
@@ -138,11 +156,13 @@ Included now:
 - a pinned self-hosted Podman renderer probe for trusted revisions
 - repeated fresh-container screenshot convergence reports
 - standalone bounded interaction-plan validation and execution
-- locked core, package, executable, MCP, worker, interaction, and browser CI
+- optional bounded Cloudflare Gemma advisory artifacts
+- locked core, package, executable, MCP, worker, interaction, advice, and browser CI
 
 Planned after this contract proves useful:
 
 - attach interaction results and captures to a new evidence contract
+- screenshot-aware vision advisory evidence
 - baseline comparison and visual-difference evidence
 - authenticated remote HTTP MCP
 - Stensibly artifact and work-item adapters
@@ -151,7 +171,7 @@ Planned after this contract proves useful:
 
 ## Security
 
-Renderprove executes project commands and drives browsers. Read [SECURITY.md](SECURITY.md) before attaching it to a self-hosted runner or MCP client.
+Renderprove executes project commands, drives browsers, and can explicitly transfer sanitized files to an external AI provider. Read [SECURITY.md](SECURITY.md) before attaching it to a self-hosted runner, MCP client, or Workers AI account.
 
 ## License
 

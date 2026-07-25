@@ -7,4 +7,12 @@ export {
   normalizeInteractionPoint,
   runInteractionPlan,
 } from './interaction.mjs';
+export {
+  adviseProject,
+  buildAdviceBundle,
+  DEFAULT_CLOUDFLARE_MODEL,
+  parseAdvisoryResponse,
+  requestCloudflareAdvice,
+  summarizeAdviceBundle,
+} from './advice.mjs';
 export { VERSION } from './version.mjs';
