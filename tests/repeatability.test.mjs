@@ -78,7 +78,15 @@ test('fails when a receipt or case is missing', () => {
   assert.equal(report.cases.find((item) => item.id === 'mobile:/').observations[1].status, 'missing');
 });
 
-test('rejects invalid run collections', () => {
+test('rejects invalid and ambiguous run collections', () => {
   assert.throws(() => buildRepeatabilityReport([makeRun('1')]), /at least two/);
-  assert.throws(() => buildRepeatabilityReport([makeRun('1'), makeRun('1')]), /duplicate/);
+  assert.throws(() => buildRepeatabilityReport([makeRun('1'), makeRun('1')]), /duplicate repeatability run name/);
+
+  const empty = makeRun('2');
+  empty.receipt.cases = [];
+  assert.throws(() => buildRepeatabilityReport([makeRun('1'), empty]), /at least one case/);
+
+  const duplicate = makeRun('2');
+  duplicate.receipt.cases.push({ ...duplicate.receipt.cases[0] });
+  assert.throws(() => buildRepeatabilityReport([makeRun('1'), duplicate]), /duplicate case id/);
 });
