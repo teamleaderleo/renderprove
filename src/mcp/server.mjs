@@ -95,6 +95,7 @@ export async function createRenderproveMcpServer({
     },
     async ({ project = '.', manifest }) => {
       let projectRoot;
+      let reviewClaimed = false;
       try {
         const resolved = await resolveMcpProject(operatorRoot, project);
         projectRoot = resolved.projectRoot;
@@ -105,6 +106,7 @@ export async function createRenderproveMcpServer({
         }
         const manifestPath = await resolveMcpManifest(projectRoot, manifest);
         activeReviews.add(projectRoot);
+        reviewClaimed = true;
         const { receipt } = await review({
           projectRoot,
           manifestPath,
@@ -117,7 +119,7 @@ export async function createRenderproveMcpServer({
       } catch (error) {
         return toolFailure(error);
       } finally {
-        if (projectRoot) activeReviews.delete(projectRoot);
+        if (reviewClaimed) activeReviews.delete(projectRoot);
       }
     },
   );
