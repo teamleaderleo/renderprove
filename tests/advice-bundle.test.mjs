@@ -44,6 +44,7 @@ test('builds a bounded deterministic bundle and redacts secret-like values', asy
   assert.equal(first.files.some((file) => file.path === 'src/app.ts'), true);
   assert.equal(first.files.some((file) => file.path === '.env'), false);
   assert.equal(first.files.some((file) => file.path.startsWith('node_modules/')), false);
+  assert.equal(first.omissions.some((item) => item.reason === 'sensitive-name' && item.path === '[sensitive-path]'), true);
   const source = first.files.find((file) => file.path === 'src/app.ts');
   assert.match(source.content, /\[REDACTED\]/);
   assert.doesNotMatch(source.content, /super-secret-value/);
@@ -75,6 +76,22 @@ test('rejects advisory paths outside the project', async (t) => {
     () => buildAdviceBundle({ projectRoot: root, includePaths: [path.join(outside, 'outside.txt')] }),
     /inside the project root/,
   );
+});
+
+test('rejects a mandatory manifest symlink before building the provider bundle', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'renderprove-advice-link-'));
+  const outside = await fs.mkdtemp(path.join(os.tmpdir(), 'renderprove-manifest-'));
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  t.after(() => fs.rm(outside, { recursive: true, force: true }));
+  const externalManifest = path.join(outside, 'renderprove.json');
+  await fs.writeFile(externalManifest, JSON.stringify({
+    version: 1,
+    project: 'linked-fixture',
+    target: { baseUrl: 'https://example.com' },
+    review: { routes: ['/'] },
+  }));
+  await fs.symlink(externalManifest, path.join(root, 'renderprove.json'));
+  await assert.rejects(() => buildAdviceBundle({ projectRoot: root }), /symbolic link/);
 });
 
 test('applies file and byte caps with explicit omissions', async (t) => {
