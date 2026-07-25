@@ -12,16 +12,20 @@ const required = [
   'bin/renderprove-mcp.mjs',
   'src/cli.mjs',
   'src/service.mjs',
+  'src/interaction.mjs',
   'src/version.mjs',
   'src/core/manifest.mjs',
   'src/core/receipt.mjs',
   'src/runtime/process.mjs',
   'src/browser/review.mjs',
+  'src/browser/interaction-plan.mjs',
+  'src/browser/interaction-executor.mjs',
   'src/mcp/cli.mjs',
   'src/mcp/projects.mjs',
   'src/mcp/results.mjs',
   'src/mcp/review-gate.mjs',
   'src/mcp/server.mjs',
+  'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'scripts/validate-package.mjs',
@@ -29,13 +33,14 @@ const required = [
   'scripts/probe-podman.sh',
   'build/worker/Containerfile',
   'docs/ARCHITECTURE.md',
+  'docs/INTERACTIONS.md',
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
   'docs/SELF_HOSTED_PROBE.md'
 ];
 
 for (const file of required) await fs.access(new URL(`../${file}`, import.meta.url));
-for (const schema of ['manifest-v1.schema.json', 'receipt-v1.schema.json']) {
+for (const schema of ['interaction-plan-v1.schema.json', 'manifest-v1.schema.json', 'receipt-v1.schema.json']) {
   const parsed = JSON.parse(await fs.readFile(new URL(`../schema/${schema}`, import.meta.url), 'utf8'));
   if (parsed.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
     throw new Error(`${schema} must use JSON Schema 2020-12`);
@@ -50,6 +55,12 @@ if (packageLock.version !== VERSION || packageLock.packages['']?.version !== VER
 }
 if (packageJson.bin?.['renderprove-mcp'] !== './bin/renderprove-mcp.mjs') {
   throw new Error('package must expose the renderprove-mcp executable');
+}
+if (packageJson.exports?.['./interaction'] !== './src/interaction.mjs') {
+  throw new Error('package must expose the bounded interaction API');
+}
+if (packageJson.exports?.['./schema/interaction-plan-v1.schema.json'] !== './schema/interaction-plan-v1.schema.json') {
+  throw new Error('package must expose the interaction plan schema');
 }
 if (packageJson.scripts?.['probe:podman'] !== 'bash scripts/probe-podman.sh') {
   throw new Error('package must expose the Podman renderer probe');
