@@ -7,6 +7,11 @@ function relativeManifest(projectRoot, sourcePath) {
   return relative || path.basename(sourcePath);
 }
 
+function sanitizeDiagnostic(diagnostic) {
+  const { stack: _stack, ...safe } = diagnostic;
+  return safe;
+}
+
 export function sanitizeManifestForMcp(manifest, projectPath) {
   return {
     version: manifest.version,
@@ -49,6 +54,10 @@ export function sanitizeReceiptForMcp(receipt, projectPath) {
       projectPath,
     },
     runtime: { mode: receipt.runtime?.mode ?? 'unknown' },
+    cases: receipt.cases.map((reviewCase) => ({
+      ...reviewCase,
+      diagnostics: reviewCase.diagnostics.map(sanitizeDiagnostic),
+    })),
   };
 }
 
