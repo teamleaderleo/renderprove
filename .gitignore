@@ -1,6 +1,8 @@
 node_modules/
 .renderprove/
+.renderprove-probe/
 .proof/
+.worker-proof/
 playwright-report/
 test-results/
 .DS_Store
