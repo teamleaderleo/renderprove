@@ -4,12 +4,12 @@
 
 Renderprove owns project-aware inspection. It does not own durable coordination, general CI scheduling, production deployment, or arbitrary agent reasoning.
 
-- **Renderprove:** manifests, project startup, browser review, evidence, receipts, and bounded inspection tools.
+- **Renderprove:** manifests, project startup, browser review, bounded interactions, evidence, receipts, and bounded inspection tools.
 - **SmolRunner:** trusted workers, bounded execution, leased workspaces and previews.
 - **Stensibly:** requests, claims, handoffs, events, and artifact references.
 - **Playwright:** browser implementation behind Renderprove's narrower contract.
 
-Every integration is optional. The CLI and receipt format remain useful without either neighboring project.
+Every integration is optional. The CLI, interaction engine, and receipt format remain useful without either neighboring project.
 
 ## Execution flow
 
@@ -18,9 +18,12 @@ Every integration is optional. The CLI and receipt format remain useful without 
 3. Wait for a same-origin loopback readiness path when running locally.
 4. Create a fresh isolated browser context for each route and viewport case.
 5. Visit the declared same-origin route and collect browser events.
-6. Capture immutable evidence and content digests.
-7. Evaluate diagnostics against explicit failure policy.
-8. Stop the local process and write one receipt.
+6. Optionally run a separately validated bounded interaction plan.
+7. Capture immutable evidence and content digests.
+8. Evaluate diagnostics against explicit failure policy.
+9. Stop the local process and write one receipt.
+
+Interaction plans are standalone in the current release. Manifest v1 and receipt v1 remain unchanged until interaction results and capture provenance receive their own evidence contract.
 
 ## Trust model
 
@@ -32,6 +35,7 @@ The initial worker is single-operator and trusted-code only. Renderprove does no
 - Local targets use loopback addresses.
 - Route and readiness paths cannot switch to another origin.
 - Browser contexts are isolated per review case and discarded immediately.
+- Interaction plans expose a closed vocabulary without arbitrary JavaScript, shell, file transfer, clipboard, or raw browser-control operations.
 - Fork pull requests must not automatically reach personal self-hosted workers.
 
 The CLI's lexical path checks assume trusted repository contents. The local MCP adds operator-root and selected-project real-path checks, plus runtime and evidence-directory checks. A repository runtime can still execute arbitrary code; symlink-hostile or untrusted workspaces require a stronger sandbox boundary such as a SmolRunner-managed container.
