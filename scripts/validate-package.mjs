@@ -16,14 +16,19 @@ const required = [
   'bin/renderprove.mjs',
   'bin/renderprove-mcp.mjs',
   'src/index.mjs',
+  'src/interaction.mjs',
   'src/version.mjs',
+  'src/browser/interaction-plan.mjs',
+  'src/browser/interaction-executor.mjs',
   'src/mcp/server.mjs',
+  'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
   'build/worker/Containerfile',
   'scripts/probe-podman.sh',
   'scripts/worker-identity.mjs',
   'docs/ARCHITECTURE.md',
+  'docs/INTERACTIONS.md',
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
   'docs/SELF_HOSTED_PROBE.md',
@@ -31,7 +36,7 @@ const required = [
 for (const file of required) {
   if (!files.has(file)) throw new Error(`npm package is missing ${file}`);
 }
-for (const privatePath of ['tests/core.test.mjs', 'tests/mcp.test.mjs', '.github/workflows/ci.yml']) {
+for (const privatePath of ['tests/core.test.mjs', 'tests/mcp.test.mjs', 'tests/interaction-plan.test.mjs', '.github/workflows/ci.yml']) {
   if (files.has(privatePath)) throw new Error(`npm package unexpectedly includes ${privatePath}`);
 }
 console.log(`Validated npm package ${pack.name}@${pack.version} with ${files.size} files.`);
