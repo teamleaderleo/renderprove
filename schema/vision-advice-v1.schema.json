@@ -1,0 +1,171 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/vision-advice-v1.schema.json",
+  "title": "Renderprove vision advice v1",
+  "description": "Bounded non-authoritative visual advice with locally trusted identity and operational metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["$schema", "schemaVersion", "authority", "requestDigest", "operational", "provider", "timing", "usage", "advice"],
+  "properties": {
+    "$schema": { "const": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/vision-advice-v1.schema.json" },
+    "schemaVersion": { "const": "vision-advice-v1" },
+    "authority": { "const": "advisory" },
+    "requestDigest": { "$ref": "#/$defs/digest" },
+    "operational": { "$ref": "#/$defs/operational" },
+    "provider": { "$ref": "#/$defs/provider" },
+    "timing": { "$ref": "#/$defs/timing" },
+    "usage": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/usage" }] },
+    "advice": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/advice" }] }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "operational": { "properties": { "status": { "const": "ok" } }, "required": ["status"] } },
+        "required": ["operational"]
+      },
+      "then": { "properties": { "advice": { "$ref": "#/$defs/advice" } } },
+      "else": { "properties": { "advice": { "type": "null" } } }
+    }
+  ],
+  "x-maxUtf8Bytes": 16384,
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "nullableProviderCode": {
+      "oneOf": [
+        { "type": "null" },
+        { "enum": ["HTTP_401", "HTTP_403", "HTTP_408", "HTTP_413", "HTTP_429", "HTTP_4XX", "HTTP_5XX", "DEADLINE_EXCEEDED", "CALLER_CANCELLED", "TRANSPORT_FAILURE", "RESPONSE_TOO_LARGE", "INVALID_RESPONSE", "CLOUDFLARE_FAILURE"] }
+      ]
+    },
+    "nullableDiagnostic": {
+      "oneOf": [
+        { "type": "null" },
+        { "enum": ["Provider authentication failed.", "Provider permission was denied.", "Provider rejected the request.", "Provider deadline was exceeded.", "Provider rate limit reached.", "Provider service is unavailable.", "Provider transport failed.", "Provider response exceeded the byte limit.", "Provider response was invalid.", "Provider request was cancelled."] }
+      ]
+    },
+    "nullableBoundedString128": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "minLength": 1, "maxLength": 128, "x-maxUtf8Bytes": 128 }
+      ]
+    },
+    "operational": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "httpStatus", "providerCode", "retryable", "diagnostic"],
+      "properties": {
+        "status": { "enum": ["ok", "auth-error", "permission-error", "invalid-request", "timeout", "rate-limited", "unavailable", "transport-error", "response-too-large", "invalid-response", "cancelled"] },
+        "httpStatus": { "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 100, "maximum": 599 }] },
+        "providerCode": { "$ref": "#/$defs/nullableProviderCode" },
+        "retryable": { "type": "boolean" },
+        "diagnostic": { "$ref": "#/$defs/nullableDiagnostic" }
+      }
+    },
+    "provider": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "model", "apiStyle", "endpointKind", "requestId"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64, "x-maxUtf8Bytes": 64 },
+        "model": { "type": "string", "minLength": 1, "maxLength": 128, "x-maxUtf8Bytes": 128 },
+        "apiStyle": { "enum": ["native", "openai-compatible"] },
+        "endpointKind": { "type": "string", "minLength": 1, "maxLength": 64, "x-maxUtf8Bytes": 64 },
+        "requestId": { "$ref": "#/$defs/nullableBoundedString128" }
+      }
+    },
+    "timing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["completedAt", "totalMs", "providerMs"],
+      "properties": {
+        "completedAt": { "type": "string", "format": "date-time" },
+        "totalMs": { "type": "integer", "minimum": 0, "maximum": 300000 },
+        "providerMs": { "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 0, "maximum": 300000 }] }
+      }
+    },
+    "nullableTokenCount": {
+      "oneOf": [{ "type": "null" }, { "type": "integer", "minimum": 0, "maximum": 10000000 }]
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["inputTokens", "outputTokens", "totalTokens", "reasoningTokens", "cachedInputTokens"],
+      "properties": {
+        "inputTokens": { "$ref": "#/$defs/nullableTokenCount" },
+        "outputTokens": { "$ref": "#/$defs/nullableTokenCount" },
+        "totalTokens": { "$ref": "#/$defs/nullableTokenCount" },
+        "reasoningTokens": { "$ref": "#/$defs/nullableTokenCount" },
+        "cachedInputTokens": { "$ref": "#/$defs/nullableTokenCount" }
+      }
+    },
+    "boundedAdviceText": { "type": "string", "minLength": 1, "maxLength": 320, "x-maxUtf8Bytes": 320 },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "confidence"],
+      "properties": {
+        "text": { "$ref": "#/$defs/boundedAdviceText" },
+        "confidence": { "enum": ["low", "medium", "high"] }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "severity"],
+      "properties": {
+        "text": { "$ref": "#/$defs/boundedAdviceText" },
+        "severity": { "enum": ["low", "medium", "high"] }
+      }
+    },
+    "suggestedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": { "text": { "$ref": "#/$defs/boundedAdviceText" } }
+    },
+    "advice": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["assessment", "observations", "risks", "suggestedFollowUpChecks"],
+      "properties": {
+        "assessment": { "enum": ["no-obvious-concern", "review-recommended", "uncertain"] },
+        "observations": { "type": "array", "maxItems": 8, "items": { "$ref": "#/$defs/observation" } },
+        "risks": { "type": "array", "maxItems": 6, "items": { "$ref": "#/$defs/risk" } },
+        "suggestedFollowUpChecks": { "type": "array", "maxItems": 6, "items": { "$ref": "#/$defs/suggestedCheck" } }
+      },
+      "allOf": [
+        {
+          "anyOf": [
+            { "properties": { "observations": { "minItems": 1 } } },
+            { "properties": { "risks": { "minItems": 1 } } },
+            { "properties": { "suggestedFollowUpChecks": { "minItems": 1 } } }
+          ]
+        },
+        {
+          "if": { "properties": { "assessment": { "const": "no-obvious-concern" } }, "required": ["assessment"] },
+          "then": {
+            "properties": {
+              "risks": {
+                "not": {
+                  "contains": {
+                    "type": "object",
+                    "properties": { "severity": { "const": "high" } },
+                    "required": ["severity"]
+                  }
+                }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "assessment": { "const": "review-recommended" } }, "required": ["assessment"] },
+          "then": {
+            "anyOf": [
+              { "properties": { "risks": { "minItems": 1 } } },
+              { "properties": { "suggestedFollowUpChecks": { "minItems": 1 } } }
+            ]
+          }
+        }
+      ]
+    }
+  }
+}
