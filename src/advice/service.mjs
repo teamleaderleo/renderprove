@@ -17,6 +17,10 @@ async function writeJsonAtomic(targetPath, value) {
   await fs.rename(temporaryPath, targetPath);
 }
 
+async function retireAdviceArtifact(advicePath) {
+  await fs.rm(advicePath, { force: true });
+}
+
 async function readReusableAdvice(advicePath, bundle) {
   try {
     const parsed = JSON.parse(await fs.readFile(advicePath, 'utf8'));
@@ -118,6 +122,7 @@ export async function adviseProject({
       reason: budget.reason,
       contact: budget.contact,
     });
+    await retireAdviceArtifact(advicePath);
     await writeJsonAtomic(statusPath, status);
     if (budget.onExceed === 'error') {
       const contact = budget.contact ? ` Contact ${budget.contact} before increasing the budget.` : '';
@@ -174,6 +179,7 @@ export async function adviseProject({
       reason: error instanceof RenderproveError ? error.code : 'UNEXPECTED_ADVICE_FAILURE',
       diagnostic: providerDiagnostic(error),
     });
+    await retireAdviceArtifact(advicePath);
     await writeJsonAtomic(statusPath, status);
     throw error;
   }
