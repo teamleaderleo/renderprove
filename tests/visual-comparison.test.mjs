@@ -105,7 +105,7 @@ test('never enlarges comparison panels and keeps their semantic order', () => {
   assert.equal(panels.triptych.height, 8);
 });
 
-test('writes a schema-shaped result, full heatmap, and deterministic panel digest', async (t) => {
+test('writes byte-deterministic JSON, a full heatmap, and a stable panel digest', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'renderprove-visual-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   const referencePath = path.join(root, 'reference.png');
@@ -131,11 +131,12 @@ test('writes a schema-shaped result, full heatmap, and deterministic panel diges
   });
   assert.equal(first.result.version, 1);
   assert.equal(first.result.deterministic, true);
+  assert.equal('generatedAt' in first.result, false);
   assert.equal(first.result.status, 'passed');
   assert.equal(first.result.images.reference.path, 'reference.png');
   assert.equal(first.result.metrics.exactChangedPixels, 1);
   assert.equal(first.result.artifacts.panelsSha256, second.result.artifacts.panelsSha256);
-  assert.equal((await fs.stat(first.resultPath)).isFile(), true);
+  assert.deepEqual(await fs.readFile(first.resultPath), await fs.readFile(second.resultPath));
   assert.equal((await fs.stat(first.differencePath)).isFile(), true);
   assert.equal((await fs.stat(first.comparisonPath)).isFile(), true);
   const difference = decodePng(await fs.readFile(first.differencePath));
