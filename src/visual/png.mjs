@@ -4,6 +4,7 @@ import { RenderproveError } from '../core/errors.mjs';
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 const MAX_PIXELS = 50_000_000;
 const CRC_TABLE = buildCrcTable();
+const KNOWN_CRITICAL_CHUNKS = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND']);
 
 function buildCrcTable() {
   const table = new Uint32Array(256);
@@ -72,6 +73,11 @@ function validateDimensions(width, height, maxPixels) {
   }
 }
 
+function isCriticalChunk(type) {
+  const first = type.charCodeAt(0);
+  return first >= 65 && first <= 90;
+}
+
 export function decodePng(input, { maxPixels = MAX_PIXELS } = {}) {
   const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input ?? []);
   if (buffer.length < PNG_SIGNATURE.length || !buffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
@@ -102,12 +108,21 @@ export function decodePng(input, { maxPixels = MAX_PIXELS } = {}) {
         throw new RenderproveError('Only non-interlaced 8-bit PNG images are supported.', { code: 'UNSUPPORTED_PNG' });
       }
       channelsForColourType(header.colourType);
+    } else if (chunk.type === 'tRNS') {
+      throw new RenderproveError('PNG tRNS transparency is unsupported; use an explicit alpha channel.', {
+        code: 'UNSUPPORTED_PNG',
+      });
     } else if (chunk.type === 'IDAT') {
       if (!header) throw new RenderproveError('PNG IDAT appeared before IHDR.', { code: 'INVALID_PNG' });
       compressed.push(chunk.data);
     } else if (chunk.type === 'IEND') {
+      if (chunk.data.length !== 0) {
+        throw new RenderproveError('PNG IEND chunk must be empty.', { code: 'INVALID_PNG' });
+      }
       sawEnd = true;
       break;
+    } else if (isCriticalChunk(chunk.type) && !KNOWN_CRITICAL_CHUNKS.has(chunk.type)) {
+      throw new RenderproveError(`PNG critical chunk ${chunk.type} is unsupported.`, { code: 'UNSUPPORTED_PNG' });
     }
   }
   if (!header || compressed.length === 0 || !sawEnd) {
