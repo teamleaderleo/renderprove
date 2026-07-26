@@ -11,6 +11,7 @@
   "exports": {
     ".": "./src/index.mjs",
     "./advice": "./src/advice.mjs",
+    "./visual": "./src/visual.mjs",
     "./interaction": "./src/interaction.mjs",
     "./manifest": "./src/core/manifest.mjs",
     "./receipt": "./src/core/receipt.mjs",
@@ -19,7 +20,8 @@
     "./schema/advice-v1.schema.json": "./schema/advice-v1.schema.json",
     "./schema/interaction-plan-v1.schema.json": "./schema/interaction-plan-v1.schema.json",
     "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
-    "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json"
+    "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json",
+    "./schema/visual-comparison-v1.schema.json": "./schema/visual-comparison-v1.schema.json"
   },
   "files": [
     "bin",
@@ -52,7 +54,7 @@
     "playwright": "1.56.1",
     "zod": "4.4.3"
   },
-  "keywords": ["playwright", "visual-testing", "browser-automation", "mcp", "coding-agents", "workers-ai", "gemma"],
+  "keywords": ["playwright", "visual-testing", "perceptual-diff", "browser-automation", "mcp", "coding-agents", "workers-ai", "gemma"],
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "git+https://github.com/teamleaderleo/renderprove.git" },
   "bugs": { "url": "https://github.com/teamleaderleo/renderprove/issues" },
