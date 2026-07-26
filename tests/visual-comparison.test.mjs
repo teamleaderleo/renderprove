@@ -105,6 +105,17 @@ test('never enlarges comparison panels and keeps their semantic order', () => {
   assert.equal(panels.triptych.height, 8);
 });
 
+test('shows transparent source panels over a deterministic checkerboard', () => {
+  const reference = solid(16, 8, 255, 0, 0, 0);
+  const candidate = new Uint8Array(reference);
+  const comparison = compareRgba(reference, candidate, 16, 8);
+  const panels = buildComparisonPanels(reference, candidate, comparison.deltaEMap, 16, 8, { maxPanelEdge: 128 });
+  assert.deepEqual([...panels.triptych.data.slice(0, 4)], [43, 46, 52, 255]);
+  assert.deepEqual([...panels.triptych.data.slice(8 * 4, 8 * 4 + 4)], [58, 61, 68, 255]);
+  const candidateStart = (16 + 8) * 4;
+  assert.deepEqual([...panels.triptych.data.slice(candidateStart, candidateStart + 4)], [43, 46, 52, 255]);
+});
+
 test('writes byte-deterministic JSON, a full heatmap, and a stable panel digest', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'renderprove-visual-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
