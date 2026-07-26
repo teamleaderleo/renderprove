@@ -92,6 +92,8 @@ export function parseArgs(argv) {
       options.referencePath = arg;
     } else if (command === 'compare' && options.candidatePath == null) {
       options.candidatePath = arg;
+    } else if (command === 'compare') {
+      throw new RenderproveError(`Unexpected argument ${arg}.`, { code: 'INVALID_ARGUMENT' });
     } else if (!positionalUsed) {
       options.projectRoot = arg;
       positionalUsed = true;
@@ -115,9 +117,14 @@ export async function runCli(argv, { stdout, stderr, cwd, env = process.env }) {
       return 0;
     }
     if (options.command === 'compare') {
-      if (options.headed || options.dryRun || options.includePaths) {
+      const disallowed = [
+        'headed', 'dryRun', 'includePaths', 'manifest', 'adviceConfig', 'receipt', 'model',
+        'maxFiles', 'maxBytes', 'maxFileBytes', 'timeoutMs',
+      ].filter((key) => options[key] != null && options[key] !== false);
+      if (disallowed.length > 0) {
         throw new RenderproveError('Browser and advisory options are unavailable for visual comparison.', {
           code: 'INVALID_ARGUMENT',
+          details: { disallowed },
         });
       }
       const comparison = await comparePngFiles({
