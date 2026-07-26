@@ -1,14 +1,12 @@
 name: Recover bounded Cloudflare vision spike result
 
 on:
-  push:
-    branches:
-      - docs/issue-29-cloudflare-vision-findings
+  pull_request:
     paths:
       - .github/workflows/vision-wire-spike-recover.yml
 
 permissions:
-  contents: write
+  contents: read
   issues: read
 
 jobs:
@@ -43,12 +41,12 @@ jobs:
           const forbidden = ['prompt', 'requestBody', 'rawResponse', 'authorization', 'apiToken', 'imageBase64', 'dataUri'];
           const text = JSON.stringify(value).toLowerCase();
           if (forbidden.some((key) => text.includes(key.toLowerCase()))) throw new Error('Forbidden field found.');
-          fs.writeFileSync('docs/cloudflare-vision-wire-spike-empirical.json', `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
+          fs.mkdirSync('test-results', { recursive: true });
+          fs.writeFileSync('test-results/cloudflare-vision-wire-spike-empirical.json', `${JSON.stringify(value, null, 2)}\n`, { mode: 0o600 });
           NODE
-      - name: Commit recovered bounded metadata
-        run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
-          git add docs/cloudflare-vision-wire-spike-empirical.json
-          git commit -m "Record bounded Cloudflare vision spike metadata"
-          git push
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-vision-wire-spike-recovered
+          path: test-results/cloudflare-vision-wire-spike-empirical.json
+          if-no-files-found: error
+          retention-days: 1
