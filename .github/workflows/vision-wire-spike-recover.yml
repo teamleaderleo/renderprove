@@ -21,6 +21,14 @@ jobs:
           node --input-type=module - <<'NODE'
           import fs from 'node:fs';
           const output = { runs: [], diagnostic: null };
+          const classifyLog = (text) => {
+            if (text.includes('Cloudflare spike credentials are unavailable.')) return 'credentials-unavailable';
+            if (text.includes('ERR_MODULE_NOT_FOUND')) return 'module-load-error';
+            if (text.includes('browserType.launch')) return 'browser-launch-error';
+            if (text.includes('SyntaxError')) return 'runner-syntax-error';
+            if (text.includes('response-too-large')) return 'response-too-large';
+            return 'unclassified-runner-failure';
+          };
           try {
             const headers = {
               Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
@@ -37,6 +45,29 @@ jobs:
               for (const run of selected) {
                 const jobsResponse = await fetch(`${base}/actions/runs/${run.id}/jobs?per_page=100`, { headers });
                 const jobsPayload = jobsResponse.ok ? await jobsResponse.json() : { jobs: [] };
+                const jobs = [];
+                for (const job of (jobsPayload.jobs ?? [])) {
+                  let failureClass = null;
+                  let logsHttpStatus = null;
+                  if (job.conclusion === 'failure') {
+                    const logsResponse = await fetch(`${base}/actions/jobs/${job.id}/logs`, { headers });
+                    logsHttpStatus = logsResponse.status;
+                    if (logsResponse.ok) failureClass = classifyLog(await logsResponse.text());
+                  }
+                  jobs.push({
+                    id: job.id,
+                    name: job.name,
+                    status: job.status,
+                    conclusion: job.conclusion,
+                    logsHttpStatus,
+                    failureClass,
+                    steps: (job.steps ?? []).map((step) => ({
+                      name: step.name,
+                      status: step.status,
+                      conclusion: step.conclusion,
+                    })),
+                  });
+                }
                 output.runs.push({
                   id: run.id,
                   runNumber: run.run_number,
@@ -46,17 +77,7 @@ jobs:
                   createdAt: run.created_at,
                   updatedAt: run.updated_at,
                   jobsHttpStatus: jobsResponse.status,
-                  jobs: (jobsPayload.jobs ?? []).map((job) => ({
-                    id: job.id,
-                    name: job.name,
-                    status: job.status,
-                    conclusion: job.conclusion,
-                    steps: (job.steps ?? []).map((step) => ({
-                      name: step.name,
-                      status: step.status,
-                      conclusion: step.conclusion,
-                    })),
-                  })),
+                  jobs,
                 });
               }
             }
