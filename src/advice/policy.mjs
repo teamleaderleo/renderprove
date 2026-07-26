@@ -2,11 +2,15 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { RenderproveError } from '../core/errors.mjs';
+import {
+  DEFAULT_ADVICE_GENERATION,
+  normalizeAdviceGeneration,
+} from './generation.mjs';
 
 export const DEFAULT_ADVICE_CONFIG_NAMES = ['renderprove-advice.json', '.renderprove-advice.json'];
 export const DEFAULT_DAILY_NEURONS = 10_000;
 export const DEFAULT_MAX_ESTIMATED_NEURONS = 1_000;
-export const DEFAULT_MAX_COMPLETION_TOKENS = 4_096;
+export const DEFAULT_MAX_COMPLETION_TOKENS = DEFAULT_ADVICE_GENERATION.maxCompletionTokens;
 
 const DEFAULT_LOCKFILE_PATTERNS = Object.freeze([
   '**/package-lock.json',
@@ -131,7 +135,7 @@ export function normalizeAdvicePolicy(input = {}, { projectRoot = process.cwd(),
   assertObject(input, 'advice config');
   assertKnownKeys(input, [
     '$schema', 'version', 'mode', 'model', 'questions', 'include', 'exclude', 'includeLockfiles',
-    'limits', 'budget', 'cache',
+    'limits', 'generation', 'budget', 'cache',
   ], 'advice config');
   if (input.version != null && input.version !== 1) {
     throw new RenderproveError('advice config version must be 1.', { code: 'UNSUPPORTED_ADVICE_CONFIG_VERSION' });
@@ -159,6 +163,10 @@ export function normalizeAdvicePolicy(input = {}, { projectRoot = process.cwd(),
   const limitsInput = input.limits ?? {};
   assertObject(limitsInput, 'advice config limits');
   assertKnownKeys(limitsInput, ['maxFiles', 'maxBytes', 'maxFileBytes', 'timeoutMs'], 'advice config limits');
+  const generation = normalizeAdviceGeneration(input.generation ?? {}, {
+    code: 'INVALID_ADVICE_CONFIG',
+    label: 'advice config generation',
+  });
   const budgetInput = input.budget ?? {};
   assertObject(budgetInput, 'advice config budget');
   assertKnownKeys(budgetInput, ['dailyNeurons', 'maxEstimatedNeurons', 'onExceed', 'contact'], 'advice config budget');
@@ -213,6 +221,7 @@ export function normalizeAdvicePolicy(input = {}, { projectRoot = process.cwd(),
       maxFileBytes: limitsInput.maxFileBytes == null ? null : normalizeInteger(limitsInput.maxFileBytes, null, 'advice config limits.maxFileBytes', { min: 1_024, max: 1_000_000 }),
       timeoutMs: limitsInput.timeoutMs == null ? null : normalizeInteger(limitsInput.timeoutMs, null, 'advice config limits.timeoutMs', { min: 1_000, max: 120_000 }),
     }),
+    generation,
     budget: Object.freeze({ dailyNeurons, maxEstimatedNeurons, onExceed, contact }),
     cache: Object.freeze({ reuse: cacheInput.reuse ?? true }),
   });
@@ -261,7 +270,7 @@ export function matchesAdviceExclude(filePath, patterns) {
   });
 }
 
-function policyEvidence(policy, { model, maxCompletionTokens }) {
+function policyEvidence(policy, { model }) {
   return {
     version: 1,
     source: policy.source,
@@ -272,9 +281,9 @@ function policyEvidence(policy, { model, maxCompletionTokens }) {
     exclude: policy.excludePatterns,
     includeLockfiles: policy.includeLockfiles,
     limits: policy.limits,
+    generation: policy.generation,
     budget: policy.budget,
     cache: policy.cache,
-    generation: { maxCompletionTokens },
   };
 }
 
@@ -292,7 +301,9 @@ function digestBundle(project, files) {
   })).digest('hex');
 }
 
-export function estimateAdviceNeurons(bundle, { maxCompletionTokens = DEFAULT_MAX_COMPLETION_TOKENS } = {}) {
+export function estimateAdviceNeurons(bundle, {
+  maxCompletionTokens = bundle?.generationPolicy?.maxCompletionTokens ?? DEFAULT_MAX_COMPLETION_TOKENS,
+} = {}) {
   const estimatedInputTokens = Math.ceil(bundle.summary.bytes / 2) + 2_000;
   const estimatedOutputTokens = maxCompletionTokens;
   const inputNeurons = estimatedInputTokens * 9_091 / 1_000_000;
@@ -304,10 +315,7 @@ export function estimateAdviceNeurons(bundle, { maxCompletionTokens = DEFAULT_MA
   });
 }
 
-export function applyAdvicePolicy(bundle, policy, {
-  model,
-  maxCompletionTokens = DEFAULT_MAX_COMPLETION_TOKENS,
-} = {}) {
+export function applyAdvicePolicy(bundle, policy, { model } = {}) {
   const mandatory = new Set([bundle.manifest, bundle.receipt].filter(Boolean));
   const omissions = [...bundle.omissions];
   const files = bundle.files.filter((file) => {
@@ -316,7 +324,7 @@ export function applyAdvicePolicy(bundle, policy, {
     omissions.push({ path: file.path, reason: 'policy-exclude', bytes: file.bytes });
     return false;
   });
-  const content = `${JSON.stringify(policyEvidence(policy, { model, maxCompletionTokens }), null, 2)}\n`;
+  const content = `${JSON.stringify(policyEvidence(policy, { model }), null, 2)}\n`;
   const virtual = {
     path: '.renderprove/advice-policy.generated.json',
     bytes: Buffer.byteLength(content),
@@ -358,8 +366,9 @@ export function applyAdvicePolicy(bundle, policy, {
     mode: policy.mode,
     reviewQuestions: policy.questions,
     policySource: policy.source,
+    generationPolicy: policy.generation,
   };
-  const estimate = estimateAdviceNeurons(withPolicy, { maxCompletionTokens });
+  const estimate = estimateAdviceNeurons(withPolicy);
   return Object.freeze({
     ...withPolicy,
     budget: Object.freeze({ ...policy.budget, ...estimate }),

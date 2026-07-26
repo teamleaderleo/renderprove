@@ -36,6 +36,7 @@ function statusRecord(status, bundle, extras = {}) {
     authoritative: false,
     bundleSha256: bundle.sha256,
     budget: bundle.budget,
+    generation: bundle.generationPolicy,
     ...extras,
   };
 }
@@ -148,6 +149,7 @@ export async function adviseProject({
       apiToken,
       model: effectiveModel,
       timeoutMs: timeoutMs ?? policy.limits.timeoutMs ?? undefined,
+      generation: policy.generation,
       fetchImpl,
     });
   } catch (error) {
