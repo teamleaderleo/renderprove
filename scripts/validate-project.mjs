@@ -17,6 +17,10 @@ const required = [
   'src/advice/cloudflare.mjs',
   'src/advice/policy.mjs',
   'src/advice/service.mjs',
+  'src/visual.mjs',
+  'src/visual/comparison.mjs',
+  'src/visual/delta-e.mjs',
+  'src/visual/png.mjs',
   'src/interaction.mjs',
   'src/version.mjs',
   'src/core/manifest.mjs',
@@ -36,6 +40,7 @@ const required = [
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
+  'schema/visual-comparison-v1.schema.json',
   'scripts/validate-package.mjs',
   'scripts/worker-identity.mjs',
   'scripts/probe-paths.mjs',
@@ -49,9 +54,11 @@ const required = [
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
   'docs/SELF_HOSTED_PROBE.md',
+  'docs/VISUAL_COMPARISON.md',
   'tests/advice-bundle.test.mjs',
   'tests/advice-cloudflare.test.mjs',
   'tests/advice-policy.test.mjs',
+  'tests/visual-comparison.test.mjs',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',
   'tests/probe-enrollment.test.mjs',
@@ -59,7 +66,13 @@ const required = [
 ];
 
 for (const file of required) await fs.access(new URL(`../${file}`, import.meta.url));
-for (const schema of ['advice-v1.schema.json', 'interaction-plan-v1.schema.json', 'manifest-v1.schema.json', 'receipt-v1.schema.json']) {
+for (const schema of [
+  'advice-v1.schema.json',
+  'interaction-plan-v1.schema.json',
+  'manifest-v1.schema.json',
+  'receipt-v1.schema.json',
+  'visual-comparison-v1.schema.json',
+]) {
   const parsed = JSON.parse(await fs.readFile(new URL(`../schema/${schema}`, import.meta.url), 'utf8'));
   if (parsed.$schema !== 'https://json-schema.org/draft/2020-12/schema') {
     throw new Error(`${schema} must use JSON Schema 2020-12`);
@@ -78,11 +91,17 @@ if (packageJson.bin?.['renderprove-mcp'] !== './bin/renderprove-mcp.mjs') {
 if (packageJson.exports?.['./advice'] !== './src/advice.mjs') {
   throw new Error('package must expose the optional advisory API');
 }
+if (packageJson.exports?.['./visual'] !== './src/visual.mjs') {
+  throw new Error('package must expose the visual comparison API');
+}
 if (packageJson.exports?.['./interaction'] !== './src/interaction.mjs') {
   throw new Error('package must expose the bounded interaction API');
 }
 if (packageJson.exports?.['./schema/advice-v1.schema.json'] !== './schema/advice-v1.schema.json') {
   throw new Error('package must expose the advice result schema');
+}
+if (packageJson.exports?.['./schema/visual-comparison-v1.schema.json'] !== './schema/visual-comparison-v1.schema.json') {
+  throw new Error('package must expose the visual comparison schema');
 }
 if (packageJson.exports?.['./schema/interaction-plan-v1.schema.json'] !== './schema/interaction-plan-v1.schema.json') {
   throw new Error('package must expose the interaction plan schema');
