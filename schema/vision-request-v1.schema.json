@@ -9,6 +9,10 @@
     "schemaVersion",
     "mode",
     "authority",
+    "commandContractId",
+    "commandContractDigest",
+    "promptPolicyVersion",
+    "canonicalizationProfile",
     "requestDigest",
     "inputs",
     "receiptSummary",
@@ -30,9 +34,20 @@
     "authority": {
       "const": "advisory"
     },
+    "commandContractId": {
+      "const": "renderprove.vision-check.v1"
+    },
+    "commandContractDigest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "promptPolicyVersion": {
+      "const": "vision-prompt-policy-v1"
+    },
+    "canonicalizationProfile": {
+      "const": "rgba8-png-zlib9-v1"
+    },
     "requestDigest": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
+      "$ref": "#/$defs/sha256"
     },
     "inputs": {
       "type": "object",
@@ -198,11 +213,12 @@
                 "name": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 128
+                  "maxLength": 128,
+                  "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
                 },
                 "path": {
                   "type": "string",
-                  "pattern": "^/[^?#]*$",
+                  "pattern": "^/[^\\u0000-\\u001F\\u007F?#]*$",
                   "maxLength": 512
                 }
               }
@@ -220,7 +236,8 @@
                 "name": {
                   "type": "string",
                   "minLength": 1,
-                  "maxLength": 128
+                  "maxLength": 128,
+                  "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
                 },
                 "width": {
                   "type": "integer",
@@ -329,7 +346,7 @@
           "const": "untrusted-evidence"
         },
         "briefText": {
-          "const": "untrusted-evidence"
+          "const": "bounded-operator-focus"
         },
         "browserDisposition": {
           "const": "deterministic-authority"
@@ -347,7 +364,8 @@
         "maxWidth",
         "maxHeight",
         "maxPixels",
-        "maxReceiptBytes"
+        "maxReceiptBytes",
+        "maxPngChunks"
       ],
       "properties": {
         "maxBriefWords": {
@@ -373,6 +391,9 @@
         },
         "maxReceiptBytes": {
           "const": 256000
+        },
+        "maxPngChunks": {
+          "const": 4096
         }
       }
     }
@@ -384,7 +405,7 @@
     },
     "projectPath": {
       "type": "string",
-      "pattern": "^project://",
+      "pattern": "^project://(?:(?!\\.{1,2}(?:/|$))(?:[A-Za-z0-9._~-]|%(?!0[0-9A-F]|1[0-9A-F]|7F)[0-9A-F]{2})+)(?:/(?:(?!\\.{1,2}(?:/|$))(?:[A-Za-z0-9._~-]|%(?!0[0-9A-F]|1[0-9A-F]|7F)[0-9A-F]{2})+))*$",
       "maxLength": 1024
     },
     "disposition": {
