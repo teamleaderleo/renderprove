@@ -99,6 +99,8 @@ The provider is instructed to answer the questions directly and to avoid generic
 
 Defaults are 4,096 completion tokens, six findings, three evidence items per finding, four strengths, and four omissions. The completion ceiling is deliberately configurable because reasoning models may consume part of it before emitting the required function call. Lower it only after a real project run proves the chosen scope still returns a complete result.
 
+When Cloudflare returns `finish_reason: "length"` before the required function call, Renderprove classifies the run as `ADVICE_COMPLETION_EXHAUSTED`. The advisory remains unavailable, and `advice-status.json` retains only safe diagnostics: finish reason, tool-call count, content length, and provider token usage. It also retains the configured completion ceiling and budget contact so an agent can ask the named operator before increasing the allowance. Generated text, credentials, and raw provider bodies remain excluded.
+
 The exact questions and generation controls are included in the bundle digest. Changing either forces a new provider call rather than reusing stale advice.
 
 ### Other defaults
@@ -154,7 +156,7 @@ The stored `advice.json` contains file paths, sizes, digests, redaction counts, 
 - strengths and evidence gaps;
 - generation settings and token usage when returned by Cloudflare.
 
-`advice-status.json` records whether the optional result is `available`, `skipped`, or `unavailable`, plus the bundle digest, budget estimate, and normalized generation policy. It is operational status, not a replacement for the versioned advisory result.
+`advice-status.json` records whether the optional result is `available`, `skipped`, or `unavailable`, plus the bundle digest, budget estimate, normalized generation policy, and privacy-safe provider diagnostics when execution reaches the model but produces no usable result. It is operational status, not a replacement for the versioned advisory result.
 
 Generation uses temperature `0`, a fixed seed, low reasoning effort, one required function call, and the declared completion ceiling. Hosted model execution can still vary across requests, model revisions, and serving changes. Treat it as a sanity check, triage aid, or extra set of eyes.
 
