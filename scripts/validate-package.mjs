@@ -19,7 +19,12 @@ const required = [
   'src/advice.mjs',
   'src/advice/bundle.mjs',
   'src/advice/cloudflare.mjs',
+  'src/advice/policy.mjs',
   'src/advice/service.mjs',
+  'src/visual.mjs',
+  'src/visual/comparison.mjs',
+  'src/visual/delta-e.mjs',
+  'src/visual/png.mjs',
   'src/interaction.mjs',
   'src/version.mjs',
   'src/browser/interaction-plan.mjs',
@@ -31,6 +36,7 @@ const required = [
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
+  'schema/visual-comparison-v1.schema.json',
   'build/worker/Containerfile',
   'scripts/probe-paths.mjs',
   'scripts/probe-podman.sh',
@@ -43,6 +49,7 @@ const required = [
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
   'docs/SELF_HOSTED_PROBE.md',
+  'docs/VISUAL_COMPARISON.md',
 ];
 for (const file of required) {
   if (!files.has(file)) throw new Error(`npm package is missing ${file}`);
@@ -52,6 +59,8 @@ for (const privatePath of [
   'tests/mcp.test.mjs',
   'tests/advice-bundle.test.mjs',
   'tests/advice-cloudflare.test.mjs',
+  'tests/advice-policy.test.mjs',
+  'tests/visual-comparison.test.mjs',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',
   'tests/probe-enrollment.test.mjs',
