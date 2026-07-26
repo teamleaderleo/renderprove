@@ -147,7 +147,9 @@ function providerEnvelopeSummary(payload, { secrets = [] } = {}) {
     toolCalls: collectToolCalls(payload).length,
     contentChars: extractModelText(content).length,
     finishReason: normalizeString(
-      payload?.choices?.[0]?.finish_reason ?? result?.choices?.[0]?.finish_reason,
+      payload?.choices?.[0]?.finish_reason
+        ?? result?.choices?.[0]?.finish_reason
+        ?? result?.finish_reason,
       '',
       80,
     ) || null,
