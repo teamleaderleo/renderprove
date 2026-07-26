@@ -5,7 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { adviseProject } from '../src/advice/service.mjs';
 
-async function makeProject() {
+async function makeProject({ maxEstimatedNeurons = 1_000 } = {}) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'renderprove-exhausted-'));
   await fs.mkdir(path.join(root, 'src'), { recursive: true });
   await fs.mkdir(path.join(root, '.renderprove'), { recursive: true });
@@ -33,15 +33,28 @@ async function makeProject() {
       maxOmissions: 1,
     },
     budget: {
-      maxEstimatedNeurons: 1_000,
+      maxEstimatedNeurons,
       contact: '@teamleaderleo',
     },
   }));
   await fs.writeFile(path.join(root, 'src', 'app.js'), 'export const ready = true;\n');
+  await fs.writeFile(path.join(root, '.renderprove', 'advice.json'), JSON.stringify({
+    version: 1,
+    authoritative: false,
+    input: { sha256: '0'.repeat(64) },
+    summary: 'stale advice must not survive',
+  }));
   return root;
 }
 
-test('classifies native finish_reason length and persists safe usage diagnostics', async (t) => {
+async function assertAdviceRetired(root) {
+  await assert.rejects(
+    fs.access(path.join(root, '.renderprove', 'advice.json')),
+    (error) => error?.code === 'ENOENT',
+  );
+}
+
+test('classifies native finish_reason length, persists safe diagnostics, and retires stale advice', async (t) => {
   const root = await makeProject();
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await assert.rejects(() => adviseProject({
@@ -73,6 +86,7 @@ test('classifies native finish_reason length and persists safe usage diagnostics
     return true;
   });
 
+  await assertAdviceRetired(root);
   const status = JSON.parse(await fs.readFile(path.join(root, '.renderprove', 'advice-status.json'), 'utf8'));
   assert.equal(status.status, 'unavailable');
   assert.equal(status.reason, 'ADVICE_COMPLETION_EXHAUSTED');
@@ -89,4 +103,30 @@ test('classifies native finish_reason length and persists safe usage diagnostics
     },
   });
   assert.doesNotMatch(JSON.stringify(status), /very-secret-api-token/);
+  assert.doesNotMatch(JSON.stringify(status), /stale advice must not survive/);
+});
+
+test('retires stale advice before a budget skip without provider access', async (t) => {
+  const root = await makeProject({ maxEstimatedNeurons: 1 });
+  t.after(() => fs.rm(root, { recursive: true, force: true }));
+  let providerCalls = 0;
+  const result = await adviseProject({
+    projectRoot: root,
+    accountId: 'account_123',
+    apiToken: 'very-secret-api-token',
+    fetchImpl: async () => {
+      providerCalls += 1;
+      return new Response('{}');
+    },
+  });
+
+  assert.equal(providerCalls, 0);
+  assert.equal(result.advice, null);
+  assert.equal(result.status.status, 'skipped');
+  assert.equal(result.status.reason, 'estimated-neuron-budget');
+  await assertAdviceRetired(root);
+  const status = JSON.parse(await fs.readFile(path.join(root, '.renderprove', 'advice-status.json'), 'utf8'));
+  assert.equal(status.status, 'skipped');
+  assert.equal(status.contact, '@teamleaderleo');
+  assert.doesNotMatch(JSON.stringify(status), /stale advice must not survive/);
 });
