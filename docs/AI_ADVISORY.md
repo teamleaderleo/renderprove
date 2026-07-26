@@ -12,7 +12,7 @@ Run the deterministic review first:
 npx renderprove review
 ```
 
-Inspect the exact sanitized bundle, questions, exclusions, and conservative Neuron estimate without sending data:
+Inspect the exact sanitized bundle, questions, exclusions, generation limits, and conservative Neuron estimate without sending data:
 
 ```bash
 npx renderprove advise --dry-run
@@ -60,6 +60,13 @@ Add `renderprove-advice.json` or `.renderprove-advice.json` to make the review f
     "maxFileBytes": 64000,
     "timeoutMs": 120000
   },
+  "generation": {
+    "maxCompletionTokens": 3072,
+    "maxFindings": 4,
+    "maxEvidencePerFinding": 3,
+    "maxStrengths": 3,
+    "maxOmissions": 3
+  },
   "budget": {
     "dailyNeurons": 10000,
     "maxEstimatedNeurons": 1000,
@@ -72,9 +79,29 @@ Add `renderprove-advice.json` or `.renderprove-advice.json` to make the review f
 }
 ```
 
-Command-line `--include`, `--model`, and limit options override the corresponding project policy for one run. Use `--advice-config path` when a repository keeps the policy under another name.
+Command-line `--include`, `--model`, and file/byte/timeout options override the corresponding project policy for one run. Use `--advice-config path` when a repository keeps the policy under another name.
 
-### Defaults
+### Questions are task policy
+
+Declared questions are placed ahead of the evidence JSON as the operator's review scope. They cannot override system rules, credential handling, privacy boundaries, or evidence requirements. Files remain untrusted evidence even when they contain prompt-like text.
+
+The provider is instructed to answer the questions directly and to avoid generic praise, broad repository opinion, or styling commentary unless a question asks for it. A project can therefore use the same command for a state-transition check, accessibility pass, dependency-focused review, or occasional exploratory opinion by changing its policy.
+
+### Generation controls
+
+`generation` bounds both the provider tool schema and local normalization:
+
+- `maxCompletionTokens`: 1,024 through 4,096;
+- `maxFindings`: 1 through 10;
+- `maxEvidencePerFinding`: 1 through 8;
+- `maxStrengths`: 0 through 10;
+- `maxOmissions`: 0 through 10.
+
+Defaults are 4,096 completion tokens, six findings, three evidence items per finding, four strengths, and four omissions. The completion ceiling is deliberately configurable because reasoning models may consume part of it before emitting the required function call. Lower it only after a real project run proves the chosen scope still returns a complete result.
+
+The exact questions and generation controls are included in the bundle digest. Changing either forces a new provider call rather than reusing stale advice.
+
+### Other defaults
 
 Without a policy file, Renderprove uses targeted mode, a conservative 1,000-Neuron per-run ceiling, a 10,000-Neuron daily planning guide, and exact-digest cache reuse.
 
@@ -90,13 +117,13 @@ The daily value is a planning guide, not shared account-wide accounting. Statele
 
 ## Budget and cache behaviour
 
-Renderprove estimates input conservatively from sanitized bytes and reserves the full 4,096-token completion ceiling. Before a provider call it compares that estimate with `budget.maxEstimatedNeurons`.
+Renderprove estimates input conservatively from sanitized bytes and reserves the configured completion-token ceiling. Before a provider call it compares that estimate with `budget.maxEstimatedNeurons`.
 
 - `onExceed: "skip"` writes `advice-status.json` with `status: "skipped"` and exits successfully.
 - `onExceed: "error"` writes the same status and returns an execution failure.
 - `budget.contact` is retained in the status so CI can tell an agent or operator whom to ask before widening the budget.
 
-An existing `advice.json` is reused only when the complete sanitized evidence and normalized policy have the same SHA-256 digest. Questions, model selection, inclusions, exclusions, limits, and budget settings are included in that digest through a generated policy evidence entry. Changing any of them forces a fresh provider call.
+An existing `advice.json` is reused only when the complete sanitized evidence and normalized policy have the same SHA-256 digest. Questions, model selection, inclusions, exclusions, limits, generation controls, and budget settings are included through a generated policy evidence entry.
 
 ## Data boundary
 
@@ -127,9 +154,9 @@ The stored `advice.json` contains file paths, sizes, digests, redaction counts, 
 - strengths and evidence gaps;
 - generation settings and token usage when returned by Cloudflare.
 
-`advice-status.json` records whether the optional result is `available`, `skipped`, or `unavailable`, plus the bundle digest and budget estimate. It is operational status, not a replacement for the versioned advisory result.
+`advice-status.json` records whether the optional result is `available`, `skipped`, or `unavailable`, plus the bundle digest, budget estimate, and normalized generation policy. It is operational status, not a replacement for the versioned advisory result.
 
-Generation uses temperature `0`, a fixed seed, low reasoning effort, one required function call, and a 4,096-token completion ceiling. Hosted model execution can still vary across requests, model revisions, and serving changes. Treat it as a sanity check, triage aid, or extra set of eyes.
+Generation uses temperature `0`, a fixed seed, low reasoning effort, one required function call, and the declared completion ceiling. Hosted model execution can still vary across requests, model revisions, and serving changes. Treat it as a sanity check, triage aid, or extra set of eyes.
 
 ## CI pattern
 
@@ -156,4 +183,4 @@ Keep browser review as the required gate. Run advisory review separately and ret
 
 For pull requests from forks, do not expose provider credentials. Use trusted branches, protected environments, or an operator-controlled follow-up workflow.
 
-Screenshot and other image inputs remain deferred to a separate vision evidence contract. The next visual slice adds deterministic baseline comparison first, then sends only semantically ambiguous evidence to a model.
+Deterministic screenshot comparison is available through `renderprove compare`. Sending screenshot evidence to a model remains deferred to a separate vision-checklist contract so programmatic visual thresholds stay authoritative.
