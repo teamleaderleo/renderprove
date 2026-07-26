@@ -7,6 +7,9 @@ export const VISUAL_COMPARISON_ALGORITHM = 'cielab-d65-cie76-alpha-weighted-v1';
 const HISTOGRAM_BINS = 4_000;
 const BIN_WIDTH = 0.05;
 const LINEAR = buildLinearTable();
+const CHECKER_SIZE = 8;
+const CHECKER_LIGHT = [58, 61, 68];
+const CHECKER_DARK = [43, 46, 52];
 
 function buildLinearTable() {
   const table = new Float64Array(256);
@@ -265,15 +268,39 @@ export function reduceRgbaArea(rgba, width, height, targetWidth, targetHeight) {
   return output;
 }
 
-function blit(target, targetWidth, source, sourceWidth, sourceHeight, offsetX, offsetY) {
+function fillCheckerboard(target, targetWidth, panelWidth, panelHeight, offsetX) {
+  for (let y = 0; y < panelHeight; y += 1) {
+    for (let x = 0; x < panelWidth; x += 1) {
+      const colour = ((Math.floor(x / CHECKER_SIZE) + Math.floor(y / CHECKER_SIZE)) & 1) === 0
+        ? CHECKER_DARK
+        : CHECKER_LIGHT;
+      const offset = (y * targetWidth + x + offsetX) * 4;
+      target[offset] = colour[0];
+      target[offset + 1] = colour[1];
+      target[offset + 2] = colour[2];
+      target[offset + 3] = 255;
+    }
+  }
+}
+
+function blit(target, targetWidth, source, sourceWidth, sourceHeight, offsetX, { composite = false } = {}) {
   for (let y = 0; y < sourceHeight; y += 1) {
     for (let x = 0; x < sourceWidth; x += 1) {
       const sourceOffset = (y * sourceWidth + x) * 4;
-      const targetOffset = ((y + offsetY) * targetWidth + x + offsetX) * 4;
-      target[targetOffset] = source[sourceOffset];
-      target[targetOffset + 1] = source[sourceOffset + 1];
-      target[targetOffset + 2] = source[sourceOffset + 2];
-      target[targetOffset + 3] = source[sourceOffset + 3];
+      const targetOffset = (y * targetWidth + x + offsetX) * 4;
+      const alpha = source[sourceOffset + 3];
+      if (!composite || alpha === 255) {
+        target[targetOffset] = source[sourceOffset];
+        target[targetOffset + 1] = source[sourceOffset + 1];
+        target[targetOffset + 2] = source[sourceOffset + 2];
+        target[targetOffset + 3] = source[sourceOffset + 3];
+      } else if (alpha > 0) {
+        const coverage = alpha / 255;
+        target[targetOffset] = Math.round(source[sourceOffset] * coverage + target[targetOffset] * (1 - coverage));
+        target[targetOffset + 1] = Math.round(source[sourceOffset + 1] * coverage + target[targetOffset + 1] * (1 - coverage));
+        target[targetOffset + 2] = Math.round(source[sourceOffset + 2] * coverage + target[targetOffset + 2] * (1 - coverage));
+        target[targetOffset + 3] = 255;
+      }
     }
   }
 }
@@ -300,9 +327,13 @@ export function buildComparisonPanels(reference, candidate, deltaEMap, width, he
     output[offset + 2] = 26;
     output[offset + 3] = 255;
   }
-  blit(output, outputWidth, referencePanel, panelWidth, panelHeight, 0, 0);
-  blit(output, outputWidth, candidatePanel, panelWidth, panelHeight, panelWidth + gap, 0);
-  blit(output, outputWidth, differencePanel, panelWidth, panelHeight, (panelWidth + gap) * 2, 0);
+  const candidateX = panelWidth + gap;
+  const differenceX = (panelWidth + gap) * 2;
+  fillCheckerboard(output, outputWidth, panelWidth, panelHeight, 0);
+  fillCheckerboard(output, outputWidth, panelWidth, panelHeight, candidateX);
+  blit(output, outputWidth, referencePanel, panelWidth, panelHeight, 0, { composite: true });
+  blit(output, outputWidth, candidatePanel, panelWidth, panelHeight, candidateX, { composite: true });
+  blit(output, outputWidth, differencePanel, panelWidth, panelHeight, differenceX);
   return Object.freeze({
     panelWidth,
     panelHeight,
