@@ -33,11 +33,17 @@ const structuredAdvice = {
 };
 
 const compactGeneration = {
+  responseMode: 'tool',
   maxCompletionTokens: 3_072,
   maxFindings: 2,
   maxEvidencePerFinding: 1,
   maxStrengths: 1,
   maxOmissions: 1,
+};
+
+const jsonSchemaGeneration = {
+  ...compactGeneration,
+  responseMode: 'json-schema',
 };
 
 test('parses fenced and structured advisory JSON while applying declared cardinality caps', () => {
@@ -58,7 +64,7 @@ test('parses fenced and structured advisory JSON while applying declared cardina
   assert.deepEqual(structured, structuredAdvice);
 });
 
-test('calls the native Workers AI endpoint with trusted questions and dynamic output limits', async () => {
+test('calls the native Workers AI endpoint with trusted questions and required tool use by default', async () => {
   const requests = [];
   const advice = await requestCloudflareAdvice({
     bundle,
@@ -103,6 +109,7 @@ test('calls the native Workers AI endpoint with trusted questions and dynamic ou
       parameters: buildAdvisoryResponseSchema(compactGeneration),
     },
   }]);
+  assert.match(requests[0].body.messages[0].content, /Call the report_advice function exactly once/);
   const userPrompt = requests[0].body.messages[1].content;
   assert.match(userPrompt, /declared operator review policy/i);
   assert.match(userPrompt, /Can deleting retained state leave the displayed value stale\?/);
@@ -125,8 +132,46 @@ test('calls the native Workers AI endpoint with trusted questions and dynamic ou
   assert.equal(advice.providerRequestId, 'request-ray');
 });
 
-test('keeps a stable default schema and validates generation limits before provider access', async () => {
+test('can request a native JSON-schema response without tool declarations', async () => {
+  const requests = [];
+  const advice = await requestCloudflareAdvice({
+    bundle,
+    accountId: 'account_123',
+    apiToken: 'very-secret-api-token',
+    generation: jsonSchemaGeneration,
+    fetchImpl: async (_url, options) => {
+      requests.push(JSON.parse(options.body));
+      return new Response(JSON.stringify({
+        success: true,
+        result: {
+          model: '@cf/google/gemma-4-26b-a4b-it',
+          response: structuredAdvice,
+          usage: { prompt_tokens: 90, completion_tokens: 15, total_tokens: 105 },
+        },
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json', 'cf-ray': 'json-schema-ray' },
+      });
+    },
+  });
+
+  assert.equal(requests.length, 1);
+  assert.equal('tools' in requests[0], false);
+  assert.equal('tool_choice' in requests[0], false);
+  assert.equal('parallel_tool_calls' in requests[0], false);
+  assert.deepEqual(requests[0].response_format, {
+    type: 'json_schema',
+    json_schema: buildAdvisoryResponseSchema(jsonSchemaGeneration),
+  });
+  assert.match(requests[0].messages[0].content, /Return exactly one JSON object matching the supplied response schema/);
+  assert.equal(advice.verdict, 'clear');
+  assert.deepEqual(advice.usage, { prompt_tokens: 90, completion_tokens: 15, total_tokens: 105 });
+  assert.equal(advice.providerRequestId, 'json-schema-ray');
+});
+
+test('keeps a stable default schema and validates generation controls before provider access', async () => {
   assert.deepEqual(ADVISORY_RESPONSE_SCHEMA, buildAdvisoryResponseSchema(DEFAULT_ADVICE_GENERATION));
+  assert.equal(DEFAULT_ADVICE_GENERATION.responseMode, 'tool');
   assert.equal(ADVISORY_RESPONSE_SCHEMA.properties.findings.maxItems, 6);
   assert.equal(ADVISORY_RESPONSE_SCHEMA.properties.findings.items.properties.evidence.maxItems, 3);
   await assert.rejects(() => requestCloudflareAdvice({
@@ -134,6 +179,15 @@ test('keeps a stable default schema and validates generation limits before provi
     accountId: 'account_123',
     apiToken: 'very-secret-api-token',
     generation: { ...DEFAULT_ADVICE_GENERATION, maxCompletionTokens: 512 },
+    fetchImpl: async () => {
+      throw new Error('provider must not be called');
+    },
+  }), (error) => error.code === 'INVALID_ADVICE_ARGUMENT');
+  await assert.rejects(() => requestCloudflareAdvice({
+    bundle,
+    accountId: 'account_123',
+    apiToken: 'very-secret-api-token',
+    generation: { ...DEFAULT_ADVICE_GENERATION, responseMode: 'yaml' },
     fetchImpl: async () => {
       throw new Error('provider must not be called');
     },
