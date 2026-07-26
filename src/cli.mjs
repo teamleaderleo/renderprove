@@ -10,7 +10,7 @@ function write(stream, value) {
 }
 
 function help() {
-  return `Renderprove ${VERSION}\n\nUsage:\n  renderprove inspect [project] [--manifest path] [--json]\n  renderprove review [project] [--manifest path] [--output path] [--headed] [--json]\n  renderprove advise [project] [--manifest path] [--receipt path] [--include path] [--output path] [--model id] [--max-files n] [--max-bytes n] [--dry-run] [--json]\n  renderprove version\n\nRenderprove reads renderprove.json or .renderprove.json from the project directory.\n\nThe advise command is optional and non-authoritative. Live Cloudflare Workers AI calls require CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Use --dry-run to inspect the sanitized bundle without network access.`;
+  return `Renderprove ${VERSION}\n\nUsage:\n  renderprove inspect [project] [--manifest path] [--json]\n  renderprove review [project] [--manifest path] [--output path] [--headed] [--json]\n  renderprove advise [project] [--manifest path] [--advice-config path] [--receipt path] [--include path] [--output path] [--model id] [--max-files n] [--max-bytes n] [--dry-run] [--json]\n  renderprove version\n\nRenderprove reads renderprove.json or .renderprove.json from the project directory. Advisory policy is read from renderprove-advice.json or .renderprove-advice.json when present.\n\nThe advise command is optional and non-authoritative. Live Cloudflare Workers AI calls require CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Use --dry-run to inspect the sanitized bundle, review questions, exclusions, and estimated Neuron use without network access.`;
 }
 
 function parseInteger(value, option, { min, max }) {
@@ -39,10 +39,17 @@ export function parseArgs(argv) {
       options.includePaths ??= [];
       options.includePaths.push(value);
       index += 1;
-    } else if (['--manifest', '--output', '--receipt', '--model'].includes(arg)) {
+    } else if (['--manifest', '--advice-config', '--output', '--receipt', '--model'].includes(arg)) {
       const value = argv[index + 1];
       if (!value) throw new RenderproveError(`${arg} requires a value.`, { code: 'INVALID_ARGUMENT' });
-      options[arg.slice(2)] = value;
+      const keys = {
+        '--manifest': 'manifest',
+        '--advice-config': 'adviceConfig',
+        '--output': 'output',
+        '--receipt': 'receipt',
+        '--model': 'model',
+      };
+      options[keys[arg]] = value;
       index += 1;
     } else if (['--max-files', '--max-bytes', '--max-file-bytes', '--timeout'].includes(arg)) {
       const value = argv[index + 1];
@@ -111,6 +118,7 @@ export async function runCli(argv, { stdout, stderr, cwd, env = process.env }) {
       const result = await adviseProject({
         projectRoot,
         manifestPath: options.manifest,
+        adviceConfigPath: options.adviceConfig,
         receiptPath: options.receipt,
         outputDir: options.output,
         includePaths: options.includePaths,
@@ -127,17 +135,32 @@ export async function runCli(argv, { stdout, stderr, cwd, env = process.env }) {
         if (options.json) write(stdout, JSON.stringify(result.bundle, null, 2));
         else {
           write(stdout, `Advisory bundle: ${result.bundle.summary.files} files, ${result.bundle.summary.bytes} bytes`);
+          write(stdout, `Mode: ${result.bundle.mode}; questions: ${result.bundle.reviewQuestions.length}`);
           write(stdout, `Redactions: ${result.bundle.summary.redactions}; omissions: ${result.bundle.summary.omissions}`);
+          write(stdout, `Estimated use: ${result.budget.estimatedNeurons} Neurons (per-run ceiling ${result.budget.maxEstimatedNeurons}; daily guide ${result.budget.dailyNeurons})`);
           write(stdout, `SHA-256: ${result.bundle.sha256}`);
+        }
+        return 0;
+      }
+      if (!result.advice) {
+        if (options.json) write(stdout, JSON.stringify(result.status, null, 2));
+        else {
+          write(stdout, `Advisory status: ${result.status.status}`);
+          write(stdout, `Reason: ${result.status.reason}`);
+          write(stdout, `Estimated use: ${result.budget.estimatedNeurons} Neurons; ceiling: ${result.budget.maxEstimatedNeurons}`);
+          if (result.budget.contact) write(stdout, `Budget contact: ${result.budget.contact}`);
+          write(stdout, `Status: ${path.relative(cwd, result.statusPath)}`);
         }
         return 0;
       }
       if (options.json) write(stdout, JSON.stringify(result.advice, null, 2));
       else {
-        write(stdout, `Advisory verdict: ${result.advice.verdict} (non-authoritative)`);
+        write(stdout, `Advisory verdict: ${result.advice.verdict} (non-authoritative${result.reused ? ', reused' : ''})`);
         write(stdout, result.advice.summary);
         write(stdout, `Findings: ${result.advice.findings.length}`);
+        write(stdout, `Estimated use: ${result.budget.estimatedNeurons} Neurons; reported total tokens: ${result.advice.usage?.total_tokens ?? 'unknown'}`);
         write(stdout, `Advice: ${path.relative(cwd, result.advicePath)}`);
+        write(stdout, `Status: ${path.relative(cwd, result.statusPath)}`);
       }
       return 0;
     }
