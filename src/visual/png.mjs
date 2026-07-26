@@ -2,9 +2,18 @@ import { deflateSync, inflateSync } from 'node:zlib';
 import { RenderproveError } from '../core/errors.mjs';
 
 const PNG_SIGNATURE = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+const JPEG_SIGNATURE = Buffer.from([0xff, 0xd8, 0xff]);
+const GIF87A_SIGNATURE = Buffer.from('GIF87a', 'ascii');
+const GIF89A_SIGNATURE = Buffer.from('GIF89a', 'ascii');
+const RIFF_SIGNATURE = Buffer.from('RIFF', 'ascii');
+const WEBP_SIGNATURE = Buffer.from('WEBP', 'ascii');
+const IEND_TYPE = Buffer.from('IEND', 'ascii');
 const MAX_PIXELS = 50_000_000;
+const MAX_PNG_CHUNKS = 4_096;
+const MAX_PNG_CHUNK_BYTES = 8_000_000;
 const CRC_TABLE = buildCrcTable();
 const KNOWN_CRITICAL_CHUNKS = new Set(['IHDR', 'PLTE', 'IDAT', 'IEND']);
+const APNG_CHUNKS = new Set(['acTL', 'fcTL', 'fdAT']);
 
 function buildCrcTable() {
   const table = new Uint32Array(256);
@@ -24,16 +33,32 @@ function crc32(buffers) {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
-function readChunk(buffer, offset) {
+function assertChunkType(type) {
+  for (const byte of type) {
+    const isLetter = (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122);
+    if (!isLetter) {
+      throw new RenderproveError('PNG chunk type must contain four ASCII letters.', { code: 'INVALID_PNG' });
+    }
+  }
+}
+
+function readChunk(buffer, offset, { maxChunkBytes = MAX_PNG_CHUNK_BYTES } = {}) {
   if (offset + 12 > buffer.length) {
     throw new RenderproveError('PNG ended inside a chunk header.', { code: 'INVALID_PNG' });
   }
   const length = buffer.readUInt32BE(offset);
+  if (length > maxChunkBytes) {
+    throw new RenderproveError(`PNG chunk exceeds the ${maxChunkBytes}-byte safety limit.`, {
+      code: 'PNG_TOO_LARGE',
+      details: { length, maxChunkBytes },
+    });
+  }
   const end = offset + 12 + length;
   if (end > buffer.length) {
     throw new RenderproveError('PNG chunk exceeds the input length.', { code: 'INVALID_PNG' });
   }
   const type = buffer.subarray(offset + 4, offset + 8);
+  assertChunkType(type);
   const data = buffer.subarray(offset + 8, offset + 8 + length);
   const expectedCrc = buffer.readUInt32BE(offset + 8 + length);
   const actualCrc = crc32([type, data]);
@@ -41,6 +66,66 @@ function readChunk(buffer, offset) {
     throw new RenderproveError(`PNG ${type.toString('ascii')} chunk has an invalid CRC.`, { code: 'INVALID_PNG' });
   }
   return { type: type.toString('ascii'), data, next: end };
+}
+
+function trailingImageType(trailing) {
+  if (trailing.indexOf(PNG_SIGNATURE) !== -1) return 'PNG';
+  if (trailing.indexOf(JPEG_SIGNATURE) !== -1) return 'JPEG';
+  if (trailing.indexOf(GIF87A_SIGNATURE) !== -1 || trailing.indexOf(GIF89A_SIGNATURE) !== -1) return 'GIF';
+  let offset = trailing.indexOf(RIFF_SIGNATURE);
+  while (offset !== -1) {
+    if (offset + 12 <= trailing.length && trailing.subarray(offset + 8, offset + 12).equals(WEBP_SIGNATURE)) {
+      return 'WebP';
+    }
+    offset = trailing.indexOf(RIFF_SIGNATURE, offset + 1);
+  }
+  return null;
+}
+
+export function preflightPngContainer(input, {
+  maxChunks = MAX_PNG_CHUNKS,
+  maxChunkBytes = MAX_PNG_CHUNK_BYTES,
+} = {}) {
+  const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input ?? []);
+  if (buffer.length < PNG_SIGNATURE.length || !buffer.subarray(0, PNG_SIGNATURE.length).equals(PNG_SIGNATURE)) {
+    throw new RenderproveError('Input is not a PNG file.', { code: 'INVALID_PNG' });
+  }
+  if (!Number.isSafeInteger(maxChunks) || maxChunks < 1 || !Number.isSafeInteger(maxChunkBytes) || maxChunkBytes < 1) {
+    throw new RenderproveError('PNG preflight limits must be positive integers.', { code: 'INVALID_PNG_ARGUMENT' });
+  }
+  let offset = PNG_SIGNATURE.length;
+  let chunkCount = 0;
+  while (offset < buffer.length) {
+    chunkCount += 1;
+    if (chunkCount > maxChunks) {
+      throw new RenderproveError(`PNG contains more than ${maxChunks} chunks.`, {
+        code: 'PNG_TOO_LARGE',
+        details: { maxChunks },
+      });
+    }
+    const chunk = readChunk(buffer, offset, { maxChunkBytes });
+    if (APNG_CHUNKS.has(chunk.type)) {
+      throw new RenderproveError(`Animated PNG chunk ${chunk.type} is unsupported.`, { code: 'UNSUPPORTED_PNG' });
+    }
+    if (chunk.type === 'IEND') {
+      if (chunk.data.length !== 0) {
+        throw new RenderproveError('PNG IEND chunk must be empty.', { code: 'INVALID_PNG' });
+      }
+      const trailing = buffer.subarray(chunk.next);
+      const imageType = trailingImageType(trailing);
+      if (imageType) {
+        throw new RenderproveError(`PNG contains a second ${imageType} image after IEND.`, {
+          code: 'UNSUPPORTED_PNG',
+        });
+      }
+      if (trailing.indexOf(IEND_TYPE) !== -1) {
+        throw new RenderproveError('PNG must contain exactly one IEND chunk.', { code: 'INVALID_PNG' });
+      }
+      return Object.freeze({ chunkCount, iendOffset: offset, trailingBytes: trailing.length });
+    }
+    offset = chunk.next;
+  }
+  throw new RenderproveError('PNG is missing IEND data.', { code: 'INVALID_PNG' });
 }
 
 function paeth(left, up, upperLeft) {
@@ -80,10 +165,8 @@ function isCriticalChunk(type) {
 
 export function decodePng(input, { maxPixels = MAX_PIXELS } = {}) {
   const buffer = Buffer.isBuffer(input) ? input : Buffer.from(input ?? []);
-  if (buffer.length < PNG_SIGNATURE.length || !buffer.subarray(0, 8).equals(PNG_SIGNATURE)) {
-    throw new RenderproveError('Input is not a PNG file.', { code: 'INVALID_PNG' });
-  }
-  let offset = 8;
+  preflightPngContainer(buffer);
+  let offset = PNG_SIGNATURE.length;
   let header = null;
   let sawEnd = false;
   const compressed = [];
