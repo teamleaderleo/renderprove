@@ -37,7 +37,7 @@ test('parses fenced and structured advisory JSON while bounding fields', () => {
   assert.deepEqual(structured, structuredAdvice);
 });
 
-test('calls the native Workers AI endpoint with the documented traditional tool request', async () => {
+test('calls the native Workers AI endpoint with the provider-required function envelope', async () => {
   const requests = [];
   const advice = await requestCloudflareAdvice({
     bundle,
@@ -49,7 +49,13 @@ test('calls the native Workers AI endpoint with the documented traditional tool 
         success: true,
         result: {
           model: '@cf/google/gemma-4-26b-a4b-it',
-          tool_calls: [{ name: 'report_advice', arguments: structuredAdvice }],
+          tool_calls: [{
+            type: 'function',
+            function: {
+              name: 'report_advice',
+              arguments: JSON.stringify(structuredAdvice),
+            },
+          }],
           usage: { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 },
         },
       }), {
@@ -65,9 +71,12 @@ test('calls the native Workers AI endpoint with the documented traditional tool 
   assert.equal(requests[0].body.seed, 17);
   assert.equal(requests[0].body.max_completion_tokens, 4096);
   assert.deepEqual(requests[0].body.tools, [{
-    name: 'report_advice',
-    description: 'Return the final bounded, non-authoritative Renderprove advisory assessment.',
-    parameters: ADVISORY_RESPONSE_SCHEMA,
+    type: 'function',
+    function: {
+      name: 'report_advice',
+      description: 'Return the final bounded, non-authoritative Renderprove advisory assessment.',
+      parameters: ADVISORY_RESPONSE_SCHEMA,
+    },
   }]);
   assert.equal('tool_choice' in requests[0].body, false);
   assert.equal('parallel_tool_calls' in requests[0].body, false);
@@ -82,22 +91,16 @@ test('calls the native Workers AI endpoint with the documented traditional tool 
   assert.equal(advice.providerRequestId, 'request-ray');
 });
 
-test('accepts OpenAI-compatible tool arguments as a compatibility fallback', async () => {
+test('accepts flat Workers AI tool arguments as a compatibility fallback', async () => {
   const advice = await requestCloudflareAdvice({
     bundle,
     accountId: 'account_123',
     apiToken: 'very-secret-api-token',
     fetchImpl: async () => new Response(JSON.stringify({
-      choices: [{
-        message: {
-          tool_calls: [{
-            function: {
-              name: 'report_advice',
-              arguments: JSON.stringify(structuredAdvice),
-            },
-          }],
-        },
-      }],
+      success: true,
+      result: {
+        tool_calls: [{ name: 'report_advice', arguments: structuredAdvice }],
+      },
     }), { status: 200, headers: { 'content-type': 'application/json' } }),
   });
   assert.equal(advice.verdict, 'clear');
@@ -111,8 +114,8 @@ test('returns useful provider validation errors with exact credentials redacted'
     fetchImpl: async () => new Response(JSON.stringify({
       success: false,
       errors: [{
-        code: 1001,
-        message: 'invalid token very-secret-api-token; unsupported field tool_choice',
+        code: 8007,
+        message: "validation error: ('body', 'tools', 0, 'function') Field required; invalid token very-secret-api-token",
       }],
     }), {
       status: 400,
@@ -120,9 +123,10 @@ test('returns useful provider validation errors with exact credentials redacted'
     }),
   }), (error) => {
     assert.equal(error.code, 'CLOUDFLARE_HTTP_400');
-    assert.match(error.message, /unsupported field tool_choice/);
+    assert.match(error.message, /Field required/);
+    assert.match(error.message, /function/);
     assert.doesNotMatch(error.message, /very-secret-api-token/);
-    assert.deepEqual(error.details.errorCodes, ['1001']);
+    assert.deepEqual(error.details.errorCodes, ['8007']);
     assert.match(error.details.errorMessages[0], /\[REDACTED\]/);
     assert.doesNotMatch(JSON.stringify(error.details), /very-secret-api-token/);
     return true;
