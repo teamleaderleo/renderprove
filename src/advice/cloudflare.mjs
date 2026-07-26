@@ -147,10 +147,13 @@ function providerEnvelopeSummary(payload, { secrets = [] } = {}) {
     toolCalls: collectToolCalls(payload).length,
     contentChars: extractModelText(content).length,
     finishReason: normalizeString(
-      payload?.choices?.[0]?.finish_reason ?? result?.choices?.[0]?.finish_reason,
+      payload?.choices?.[0]?.finish_reason
+        ?? result?.choices?.[0]?.finish_reason
+        ?? result?.finish_reason,
       '',
       80,
     ) || null,
+    usage: normalizeUsage(result?.usage ?? payload?.usage),
     errorCodes: providerErrors
       .map((error) => normalizeString(String(error?.code ?? ''), '', 80))
       .filter(Boolean),
@@ -158,6 +161,19 @@ function providerEnvelopeSummary(payload, { secrets = [] } = {}) {
       .map((error) => safeDiagnosticText(error?.message, secrets))
       .filter(Boolean),
   };
+}
+
+function invalidAdviceResponse(message, providerSummary, cause) {
+  const exhausted = providerSummary?.finishReason === 'length';
+  const prefix = exhausted
+    ? 'Cloudflare Workers AI exhausted the configured completion budget before returning advisory tool arguments.'
+    : message;
+  const suffix = providerSummary ? ` Provider envelope: ${JSON.stringify(providerSummary)}.` : '';
+  return new RenderproveError(`${prefix}${suffix}`, {
+    code: exhausted ? 'ADVICE_COMPLETION_EXHAUSTED' : 'INVALID_ADVICE_RESPONSE',
+    cause,
+    details: providerSummary,
+  });
 }
 
 export function parseAdvisoryResponse(
@@ -170,21 +186,20 @@ export function parseAdvisoryResponse(
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start < 0 || end < start) {
-    const suffix = providerSummary ? ` Provider envelope: ${JSON.stringify(providerSummary)}.` : '';
-    throw new RenderproveError(`Cloudflare Workers AI returned no advisory tool arguments or JSON object.${suffix}`, {
-      code: 'INVALID_ADVICE_RESPONSE',
-      details: providerSummary,
-    });
+    throw invalidAdviceResponse(
+      'Cloudflare Workers AI returned no advisory tool arguments or JSON object.',
+      providerSummary,
+    );
   }
   let parsed;
   try {
     parsed = JSON.parse(text.slice(start, end + 1));
   } catch (cause) {
-    throw new RenderproveError('Cloudflare Workers AI returned invalid advisory JSON.', {
-      code: 'INVALID_ADVICE_RESPONSE',
+    throw invalidAdviceResponse(
+      'Cloudflare Workers AI returned invalid advisory JSON.',
+      providerSummary,
       cause,
-      details: providerSummary,
-    });
+    );
   }
   const verdict = ['clear', 'concern', 'unknown'].includes(parsed?.verdict) ? parsed.verdict : 'unknown';
   return {

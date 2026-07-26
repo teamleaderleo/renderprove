@@ -61,6 +61,7 @@ for (const privatePath of [
   'tests/advice-bundle.test.mjs',
   'tests/advice-cloudflare.test.mjs',
   'tests/advice-policy.test.mjs',
+  'tests/advice-status.test.mjs',
   'tests/visual-comparison.test.mjs',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',

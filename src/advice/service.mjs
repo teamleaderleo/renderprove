@@ -41,6 +41,23 @@ function statusRecord(status, bundle, extras = {}) {
   };
 }
 
+function providerDiagnostic(error) {
+  if (!(error instanceof RenderproveError) || !error.details || typeof error.details !== 'object') return null;
+  const details = error.details;
+  const usage = details.usage && typeof details.usage === 'object'
+    ? Object.fromEntries(['prompt_tokens', 'completion_tokens', 'total_tokens']
+      .filter((key) => Number.isFinite(details.usage[key]) && details.usage[key] >= 0)
+      .map((key) => [key, details.usage[key]]))
+    : null;
+  const diagnostic = {
+    finishReason: typeof details.finishReason === 'string' ? details.finishReason.slice(0, 80) : null,
+    toolCalls: Number.isInteger(details.toolCalls) && details.toolCalls >= 0 ? details.toolCalls : null,
+    contentChars: Number.isInteger(details.contentChars) && details.contentChars >= 0 ? details.contentChars : null,
+    usage: usage && Object.keys(usage).length > 0 ? usage : null,
+  };
+  return Object.values(diagnostic).some((value) => value != null) ? diagnostic : null;
+}
+
 export async function adviseProject({
   projectRoot = process.cwd(),
   manifestPath,
@@ -155,6 +172,7 @@ export async function adviseProject({
   } catch (error) {
     const status = statusRecord('unavailable', bundle, {
       reason: error instanceof RenderproveError ? error.code : 'UNEXPECTED_ADVICE_FAILURE',
+      diagnostic: providerDiagnostic(error),
     });
     await writeJsonAtomic(statusPath, status);
     throw error;
