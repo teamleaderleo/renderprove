@@ -56,15 +56,17 @@ test('round-trips deterministic RGBA PNG data', () => {
 test('reports exact and perceptual tails with declared threshold failures', () => {
   const reference = solid(10, 10, 40, 40, 40);
   const candidate = new Uint8Array(reference);
-  candidate[0] = 255;
-  candidate[1] = 255;
-  candidate[2] = 255;
+  for (const offset of [0, 4]) {
+    candidate[offset] = 255;
+    candidate[offset + 1] = 255;
+    candidate[offset + 2] = 255;
+  }
   const result = compareRgba(reference, candidate, 10, 10, {
     thresholds: { maxP99DeltaE: 0, maxObviousFraction: 0, maxAlphaError: 0 },
   });
   assert.equal(result.status, 'failed');
-  assert.equal(result.metrics.exactChangedPixels, 1);
-  assert.equal(result.metrics.exactChangedFraction, 0.01);
+  assert.equal(result.metrics.exactChangedPixels, 2);
+  assert.equal(result.metrics.exactChangedFraction, 0.02);
   assert.equal(result.metrics.maxDeltaE > 2, true);
   assert.equal(result.metrics.p99DeltaE > 0, true);
   assert.deepEqual(result.failures, ['p99-delta-e', 'obvious-fraction']);
@@ -160,6 +162,10 @@ test('parses and runs the compare CLI with a failing threshold exit code', async
     maxAlphaError: 4,
     maxPanelEdge: 512,
   });
+  assert.throws(
+    () => parseArgs(['compare', 'before.png', 'after.png', 'third.png']),
+    /Unexpected argument third\.png/,
+  );
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'renderprove-visual-cli-'));
   t.after(() => fs.rm(root, { recursive: true, force: true }));
   await fs.writeFile(path.join(root, 'before.png'), encodePng({ width: 2, height: 2, data: solid(2, 2, 0, 0, 0) }));
