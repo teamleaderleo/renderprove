@@ -282,9 +282,12 @@ export async function requestCloudflareAdvice({
             { role: 'user', content: buildUserPrompt(bundle) },
           ],
           tools: [{
-            name: ADVICE_TOOL_NAME,
-            description: 'Return the final bounded, non-authoritative Renderprove advisory assessment.',
-            parameters: ADVISORY_RESPONSE_SCHEMA,
+            type: 'function',
+            function: {
+              name: ADVICE_TOOL_NAME,
+              description: 'Return the final bounded, non-authoritative Renderprove advisory assessment.',
+              parameters: ADVISORY_RESPONSE_SCHEMA,
+            },
           }],
           temperature: 0,
           seed: 17,
