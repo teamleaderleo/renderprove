@@ -1,0 +1,118 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/visual-comparison-v1.schema.json",
+  "title": "Renderprove visual comparison v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "deterministic",
+    "algorithm",
+    "status",
+    "failures",
+    "thresholds",
+    "images",
+    "metrics",
+    "artifacts"
+  ],
+  "properties": {
+    "version": { "const": 1 },
+    "deterministic": { "const": true },
+    "algorithm": { "const": "cielab-d65-cie76-alpha-weighted-v1" },
+    "status": { "enum": ["passed", "failed"] },
+    "failures": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "enum": ["p99-delta-e", "obvious-fraction", "alpha-error"] }
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxP99DeltaE", "maxObviousFraction", "maxAlphaError"],
+      "properties": {
+        "maxP99DeltaE": { "type": "number", "minimum": 0, "maximum": 200 },
+        "maxObviousFraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maxAlphaError": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
+    "images": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "candidate"],
+      "properties": {
+        "reference": { "$ref": "#/$defs/image" },
+        "candidate": { "$ref": "#/$defs/image" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pixels",
+        "visiblePixels",
+        "exactChangedPixels",
+        "exactChangedFraction",
+        "meanDeltaE",
+        "p95DeltaE",
+        "p99DeltaE",
+        "maxDeltaE",
+        "imperceptibleFraction",
+        "obviousFraction",
+        "maxAlphaError"
+      ],
+      "properties": {
+        "pixels": { "type": "integer", "minimum": 1 },
+        "visiblePixels": { "type": "integer", "minimum": 0 },
+        "exactChangedPixels": { "type": "integer", "minimum": 0 },
+        "exactChangedFraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "meanDeltaE": { "type": "number", "minimum": 0 },
+        "p95DeltaE": { "type": "number", "minimum": 0 },
+        "p99DeltaE": { "type": "number", "minimum": 0 },
+        "maxDeltaE": { "type": "number", "minimum": 0 },
+        "imperceptibleFraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "obviousFraction": { "type": "number", "minimum": 0, "maximum": 1 },
+        "maxAlphaError": { "type": "integer", "minimum": 0, "maximum": 255 }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "difference",
+        "differenceSha256",
+        "comparison",
+        "comparisonSha256",
+        "panelsSha256",
+        "panelWidth",
+        "panelHeight",
+        "panelOrder"
+      ],
+      "properties": {
+        "difference": { "const": "difference.png" },
+        "differenceSha256": { "$ref": "#/$defs/digest" },
+        "comparison": { "const": "comparison.png" },
+        "comparisonSha256": { "$ref": "#/$defs/digest" },
+        "panelsSha256": { "$ref": "#/$defs/digest" },
+        "panelWidth": { "type": "integer", "minimum": 1 },
+        "panelHeight": { "type": "integer", "minimum": 1 },
+        "panelOrder": {
+          "const": ["reference", "candidate", "difference"]
+        }
+      }
+    }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "width", "height", "sha256"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "width": { "type": "integer", "minimum": 1 },
+        "height": { "type": "integer", "minimum": 1 },
+        "sha256": { "$ref": "#/$defs/digest" }
+      }
+    }
+  }
+}

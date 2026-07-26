@@ -1,6 +1,7 @@
 import path from 'node:path';
 import { inspectProject, reviewProject } from './service.mjs';
 import { adviseProject } from './advice/service.mjs';
+import { comparePngFiles, summarizeVisualComparison } from './visual/comparison.mjs';
 import { summarizeReceipt } from './core/receipt.mjs';
 import { RenderproveError } from './core/errors.mjs';
 import { VERSION } from './version.mjs';
@@ -10,7 +11,7 @@ function write(stream, value) {
 }
 
 function help() {
-  return `Renderprove ${VERSION}\n\nUsage:\n  renderprove inspect [project] [--manifest path] [--json]\n  renderprove review [project] [--manifest path] [--output path] [--headed] [--json]\n  renderprove advise [project] [--manifest path] [--advice-config path] [--receipt path] [--include path] [--output path] [--model id] [--max-files n] [--max-bytes n] [--dry-run] [--json]\n  renderprove version\n\nRenderprove reads renderprove.json or .renderprove.json from the project directory. Advisory policy is read from renderprove-advice.json or .renderprove-advice.json when present.\n\nThe advise command is optional and non-authoritative. Live Cloudflare Workers AI calls require CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Use --dry-run to inspect the sanitized bundle, review questions, exclusions, and estimated Neuron use without network access.`;
+  return `Renderprove ${VERSION}\n\nUsage:\n  renderprove inspect [project] [--manifest path] [--json]\n  renderprove review [project] [--manifest path] [--output path] [--headed] [--json]\n  renderprove compare <reference.png> <candidate.png> [--output path] [--max-p99-delta-e n] [--max-obvious-fraction n] [--max-alpha-error n] [--max-panel-edge n] [--json]\n  renderprove advise [project] [--manifest path] [--advice-config path] [--receipt path] [--include path] [--output path] [--model id] [--max-files n] [--max-bytes n] [--dry-run] [--json]\n  renderprove version\n\nRenderprove reads renderprove.json or .renderprove.json from the project directory. Advisory policy is read from renderprove-advice.json or .renderprove-advice.json when present.\n\nThe compare command writes deterministic CIE76 metrics, a full-resolution Delta-E heatmap, and a reference/candidate/difference triptych. It is separate from receipt v1.\n\nThe advise command is optional and non-authoritative. Live Cloudflare Workers AI calls require CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Use --dry-run to inspect the sanitized bundle, review questions, exclusions, and estimated Neuron use without network access.`;
 }
 
 function parseInteger(value, option, { min, max }) {
@@ -19,6 +20,17 @@ function parseInteger(value, option, { min, max }) {
   }
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed < min || parsed > max) {
+    throw new RenderproveError(`${option} must be between ${min} and ${max}.`, { code: 'INVALID_ARGUMENT' });
+  }
+  return parsed;
+}
+
+function parseNumber(value, option, { min, max }) {
+  if (value == null || value.trim() === '') {
+    throw new RenderproveError(`${option} requires a number.`, { code: 'INVALID_ARGUMENT' });
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
     throw new RenderproveError(`${option} must be between ${min} and ${max}.`, { code: 'INVALID_ARGUMENT' });
   }
   return parsed;
@@ -51,7 +63,7 @@ export function parseArgs(argv) {
       };
       options[keys[arg]] = value;
       index += 1;
-    } else if (['--max-files', '--max-bytes', '--max-file-bytes', '--timeout'].includes(arg)) {
+    } else if (['--max-files', '--max-bytes', '--max-file-bytes', '--timeout', '--max-alpha-error', '--max-panel-edge'].includes(arg)) {
       const value = argv[index + 1];
       if (!value) throw new RenderproveError(`${arg} requires a value.`, { code: 'INVALID_ARGUMENT' });
       const limits = {
@@ -59,12 +71,29 @@ export function parseArgs(argv) {
         '--max-bytes': { key: 'maxBytes', min: 1_024, max: 4_000_000 },
         '--max-file-bytes': { key: 'maxFileBytes', min: 1_024, max: 1_000_000 },
         '--timeout': { key: 'timeoutMs', min: 1_000, max: 120_000 },
+        '--max-alpha-error': { key: 'maxAlphaError', min: 0, max: 255 },
+        '--max-panel-edge': { key: 'maxPanelEdge', min: 32, max: 4_096 },
       };
       const limit = limits[arg];
       options[limit.key] = parseInteger(value, arg, limit);
       index += 1;
+    } else if (['--max-p99-delta-e', '--max-obvious-fraction'].includes(arg)) {
+      const value = argv[index + 1];
+      const limits = {
+        '--max-p99-delta-e': { key: 'maxP99DeltaE', min: 0, max: 200 },
+        '--max-obvious-fraction': { key: 'maxObviousFraction', min: 0, max: 1 },
+      };
+      const limit = limits[arg];
+      options[limit.key] = parseNumber(value, arg, limit);
+      index += 1;
     } else if (arg.startsWith('-')) {
       throw new RenderproveError(`Unknown option ${arg}.`, { code: 'INVALID_ARGUMENT' });
+    } else if (command === 'compare' && options.referencePath == null) {
+      options.referencePath = arg;
+    } else if (command === 'compare' && options.candidatePath == null) {
+      options.candidatePath = arg;
+    } else if (command === 'compare') {
+      throw new RenderproveError(`Unexpected argument ${arg}.`, { code: 'INVALID_ARGUMENT' });
     } else if (!positionalUsed) {
       options.projectRoot = arg;
       positionalUsed = true;
@@ -86,6 +115,38 @@ export async function runCli(argv, { stdout, stderr, cwd, env = process.env }) {
     if (options.command === 'version' || options.command === '--version' || options.command === '-v') {
       write(stdout, VERSION);
       return 0;
+    }
+    if (options.command === 'compare') {
+      const disallowed = [
+        'headed', 'dryRun', 'includePaths', 'manifest', 'adviceConfig', 'receipt', 'model',
+        'maxFiles', 'maxBytes', 'maxFileBytes', 'timeoutMs',
+      ].filter((key) => options[key] != null && options[key] !== false);
+      if (disallowed.length > 0) {
+        throw new RenderproveError('Browser and advisory options are unavailable for visual comparison.', {
+          code: 'INVALID_ARGUMENT',
+          details: { disallowed },
+        });
+      }
+      const comparison = await comparePngFiles({
+        referencePath: options.referencePath,
+        candidatePath: options.candidatePath,
+        outputDir: options.output,
+        cwd,
+        maxPanelEdge: options.maxPanelEdge,
+        thresholds: {
+          maxP99DeltaE: options.maxP99DeltaE,
+          maxObviousFraction: options.maxObviousFraction,
+          maxAlphaError: options.maxAlphaError,
+        },
+      });
+      if (options.json) write(stdout, JSON.stringify(comparison.result, null, 2));
+      else {
+        write(stdout, summarizeVisualComparison(comparison.result));
+        write(stdout, `Result: ${path.relative(cwd, comparison.resultPath)}`);
+        write(stdout, `Comparison: ${path.relative(cwd, comparison.comparisonPath)}`);
+        write(stdout, `Difference: ${path.relative(cwd, comparison.differencePath)}`);
+      }
+      return comparison.result.status === 'passed' ? 0 : 1;
     }
     if (options.command === 'inspect') {
       const manifest = await inspectProject({ projectRoot, manifestPath: options.manifest });

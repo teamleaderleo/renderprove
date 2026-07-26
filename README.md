@@ -79,6 +79,25 @@ It excludes arbitrary JavaScript, shell commands, raw Playwright access, file up
 
 See [interaction plans](docs/INTERACTIONS.md) and the [interaction-plan v1 schema](schema/interaction-plan-v1.schema.json).
 
+## Deterministic visual comparison
+
+Compare two equally sized PNG screenshots without launching a browser or calling a model:
+
+```bash
+npx renderprove compare baseline.png candidate.png
+```
+
+The command writes a strict [visual comparison v1](schema/visual-comparison-v1.schema.json) result, a full-resolution Delta-E heatmap, and a fixed-order `reference | candidate | difference` triptych. It records exact changed pixels plus alpha-weighted CIE76 mean, p95, p99, maximum, tail fractions, and alpha error.
+
+```bash
+npx renderprove compare baseline.png candidate.png \
+  --max-p99-delta-e 1.5 \
+  --max-obvious-fraction 0.001 \
+  --output .renderprove/visual/home-desktop
+```
+
+The result exits with `0` when declared thresholds pass, `1` when the completed comparison fails, and `2` for input or execution failures. The artifact remains separate from receipt v1. See [deterministic visual comparison](docs/VISUAL_COMPARISON.md) for the metric boundary, panel digest, PNG limits, and planned FLIP upgrade.
+
 ## Optional Gemma advisory
 
 Cloudflare Workers AI can provide a cheap secondary review over the latest receipt and a bounded set of project files:
@@ -91,11 +110,11 @@ export CLOUDFLARE_API_TOKEN='your-workers-ai-token'
 npx renderprove advise
 ```
 
-The default model is `@cf/google/gemma-4-26b-a4b-it`. Renderprove auto-selects common source and configuration files, skips dependencies and build output, rejects path escapes, redacts common secret patterns, and caps the transmitted file and byte counts. Repeated `--include` options can focus a monorepo.
+The default model is `@cf/google/gemma-4-26b-a4b-it`. A project can declare focused questions, includes, excludes, limits, a per-run Neuron ceiling, and exact-digest cache reuse in `renderprove-advice.json`. Common lockfiles are excluded by default and can be enabled for dependency-focused reviews.
 
-The result is written to `.renderprove/advice.json`, follows [advice v1](schema/advice-v1.schema.json), and always declares `authoritative: false`. AI output does not change the deterministic browser-review status or exit code. Use `--dry-run --json` to inspect the exact sanitized bundle before transfer.
+The result is written to `.renderprove/advice.json`, follows [advice v1](schema/advice-v1.schema.json), and always declares `authoritative: false`. `.renderprove/advice-status.json` says whether the optional result is available, skipped, or unavailable. AI output does not change deterministic browser-review status or exit code. Use `--dry-run --json` to inspect the exact sanitized bundle and conservative Neuron estimate before transfer.
 
-See [optional AI advisory review](docs/AI_ADVISORY.md) for CI setup, data-egress guidance, limits, pricing notes, and the full contract.
+See [optional AI advisory review](docs/AI_ADVISORY.md) for the short project policy, CI setup, data-egress guidance, limits, and cache contract.
 
 ## Manifest
 
@@ -156,14 +175,16 @@ Included now:
 - a pinned self-hosted Podman renderer probe for trusted revisions
 - repeated fresh-container screenshot convergence reports
 - standalone bounded interaction-plan validation and execution
-- optional bounded Cloudflare Gemma advisory artifacts
-- locked core, package, executable, MCP, worker, interaction, advice, and browser CI
+- deterministic standalone PNG comparison with exact and perceptual evidence
+- optional bounded Cloudflare Gemma advisory artifacts with project policy and cache reuse
+- locked core, package, executable, MCP, worker, interaction, advice, visual, and browser CI
 
 Planned after this contract proves useful:
 
 - attach interaction results and captures to a new evidence contract
-- screenshot-aware vision advisory evidence
-- baseline comparison and visual-difference evidence
+- add baseline identity and visual-comparison references to receipt v2
+- add screenshot-aware checklist advisory evidence
+- add FLIP as an explicitly versioned rendered-image metric
 - authenticated remote HTTP MCP
 - Stensibly artifact and work-item adapters
 - SmolRunner leased-preview execution
@@ -171,7 +192,7 @@ Planned after this contract proves useful:
 
 ## Security
 
-Renderprove executes project commands, drives browsers, and can explicitly transfer sanitized files to an external AI provider. Read [SECURITY.md](SECURITY.md) before attaching it to a self-hosted runner, MCP client, or Workers AI account.
+Renderprove executes project commands, drives browsers, compares operator-selected screenshots, and can explicitly transfer sanitized files to an external AI provider. Read [SECURITY.md](SECURITY.md) before attaching it to a self-hosted runner, MCP client, or Workers AI account.
 
 ## License
 
