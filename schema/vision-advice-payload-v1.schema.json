@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/vision-advice-payload-v1.schema.json",
+  "title": "Renderprove vision advice provider payload v1",
+  "description": "Private untrusted provider payload. Trusted request, provider, timing, usage, and operational metadata are injected locally.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["assessment", "observations", "risks", "suggestedFollowUpChecks"],
+  "properties": {
+    "assessment": { "enum": ["no-obvious-concern", "review-recommended", "uncertain"] },
+    "observations": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/$defs/observation" }
+    },
+    "risks": {
+      "type": "array",
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/risk" }
+    },
+    "suggestedFollowUpChecks": {
+      "type": "array",
+      "maxItems": 6,
+      "items": { "$ref": "#/$defs/suggestedCheck" }
+    }
+  },
+  "allOf": [
+    {
+      "anyOf": [
+        { "properties": { "observations": { "minItems": 1 } } },
+        { "properties": { "risks": { "minItems": 1 } } },
+        { "properties": { "suggestedFollowUpChecks": { "minItems": 1 } } }
+      ]
+    },
+    {
+      "if": { "properties": { "assessment": { "const": "no-obvious-concern" } }, "required": ["assessment"] },
+      "then": {
+        "properties": {
+          "risks": {
+            "not": {
+              "contains": {
+                "type": "object",
+                "properties": { "severity": { "const": "high" } },
+                "required": ["severity"]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "assessment": { "const": "review-recommended" } }, "required": ["assessment"] },
+      "then": {
+        "anyOf": [
+          { "properties": { "risks": { "minItems": 1 } } },
+          { "properties": { "suggestedFollowUpChecks": { "minItems": 1 } } }
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "boundedText": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 320,
+      "x-maxUtf8Bytes": 320
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "confidence"],
+      "properties": {
+        "text": { "$ref": "#/$defs/boundedText" },
+        "confidence": { "enum": ["low", "medium", "high"] }
+      }
+    },
+    "risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text", "severity"],
+      "properties": {
+        "text": { "$ref": "#/$defs/boundedText" },
+        "severity": { "enum": ["low", "medium", "high"] }
+      }
+    },
+    "suggestedCheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["text"],
+      "properties": { "text": { "$ref": "#/$defs/boundedText" } }
+    }
+  }
+}
