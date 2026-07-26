@@ -116,7 +116,6 @@ export async function comparePngFiles({
   const result = Object.freeze({
     version: 1,
     deterministic: true,
-    generatedAt: new Date().toISOString(),
     algorithm: comparison.algorithm,
     status: comparison.status,
     failures: comparison.failures,
