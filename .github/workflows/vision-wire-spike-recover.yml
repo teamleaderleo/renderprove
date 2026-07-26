@@ -20,43 +20,51 @@ jobs:
         run: |
           node - <<'NODE'
           const fs = require('node:fs');
-          const headers = {
-            Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
-            Accept: 'application/vnd.github+json',
-            'X-GitHub-Api-Version': '2022-11-28',
-          };
-          const base = `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}`;
-          const runsResponse = await fetch(`${base}/actions/runs?branch=docs%2Fissue-29-cloudflare-vision-findings&event=push&per_page=20`, { headers });
-          if (!runsResponse.ok) throw new Error(`Run list failed with ${runsResponse.status}`);
-          const runPayload = await runsResponse.json();
-          const selected = (runPayload.workflow_runs ?? []).filter((run) => run.name === 'Synthetic Cloudflare vision wire spike').slice(0, 5);
-          const runs = [];
-          for (const run of selected) {
-            const jobsResponse = await fetch(`${base}/actions/runs/${run.id}/jobs?per_page=100`, { headers });
-            const jobsPayload = jobsResponse.ok ? await jobsResponse.json() : { jobs: [] };
-            runs.push({
-              id: run.id,
-              runNumber: run.run_number,
-              headSha: run.head_sha,
-              status: run.status,
-              conclusion: run.conclusion,
-              createdAt: run.created_at,
-              updatedAt: run.updated_at,
-              jobs: (jobsPayload.jobs ?? []).map((job) => ({
-                id: job.id,
-                name: job.name,
-                status: job.status,
-                conclusion: job.conclusion,
-                steps: (job.steps ?? []).map((step) => ({
-                  name: step.name,
-                  status: step.status,
-                  conclusion: step.conclusion,
-                })),
-              })),
-            });
+          const output = { runs: [], diagnostic: null };
+          try {
+            const headers = {
+              Authorization: `Bearer ${process.env.GITHUB_TOKEN}`,
+              Accept: 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+            };
+            const base = `https://api.github.com/repos/${process.env.GITHUB_REPOSITORY}`;
+            const runsResponse = await fetch(`${base}/actions/runs?branch=docs%2Fissue-29-cloudflare-vision-findings&event=push&per_page=20`, { headers });
+            if (!runsResponse.ok) {
+              output.diagnostic = { stage: 'list-runs', httpStatus: runsResponse.status };
+            } else {
+              const runPayload = await runsResponse.json();
+              const selected = (runPayload.workflow_runs ?? []).filter((run) => run.name === 'Synthetic Cloudflare vision wire spike').slice(0, 5);
+              for (const run of selected) {
+                const jobsResponse = await fetch(`${base}/actions/runs/${run.id}/jobs?per_page=100`, { headers });
+                const jobsPayload = jobsResponse.ok ? await jobsResponse.json() : { jobs: [] };
+                output.runs.push({
+                  id: run.id,
+                  runNumber: run.run_number,
+                  headSha: run.head_sha,
+                  status: run.status,
+                  conclusion: run.conclusion,
+                  createdAt: run.created_at,
+                  updatedAt: run.updated_at,
+                  jobsHttpStatus: jobsResponse.status,
+                  jobs: (jobsPayload.jobs ?? []).map((job) => ({
+                    id: job.id,
+                    name: job.name,
+                    status: job.status,
+                    conclusion: job.conclusion,
+                    steps: (job.steps ?? []).map((step) => ({
+                      name: step.name,
+                      status: step.status,
+                      conclusion: step.conclusion,
+                    })),
+                  })),
+                });
+              }
+            }
+          } catch (error) {
+            output.diagnostic = { stage: 'exception', name: error?.name ?? 'Error' };
           }
           fs.mkdirSync('test-results', { recursive: true });
-          fs.writeFileSync('test-results/cloudflare-vision-spike-run-diagnostics.json', `${JSON.stringify({ runs }, null, 2)}\n`);
+          fs.writeFileSync('test-results/cloudflare-vision-spike-run-diagnostics.json', `${JSON.stringify(output, null, 2)}\n`);
           NODE
       - uses: actions/upload-artifact@v4
         with:
