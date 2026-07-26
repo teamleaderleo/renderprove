@@ -18,8 +18,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
-          node - <<'NODE'
-          const fs = require('node:fs');
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
           const output = { runs: [], diagnostic: null };
           try {
             const headers = {
