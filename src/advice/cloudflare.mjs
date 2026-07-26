@@ -159,14 +159,18 @@ function sortedKeys(value) {
   return Object.keys(value).sort().slice(0, 24);
 }
 
-function safeDiagnosticText(value) {
-  return normalizeString(value, '', 500)
+function safeDiagnosticText(value, secrets = []) {
+  let text = normalizeString(value, '', 500)
     .replace(/\bBearer\s+\S+/gi, 'Bearer [REDACTED]')
     .replace(/((?:api[_-]?key|token|secret|password)\s*[:=]\s*)\S+/gi, '$1[REDACTED]')
     .replace(/https?:\/\/[^\s/@:]+:[^\s/@]+@/gi, 'https://[REDACTED]@');
+  for (const secret of secrets) {
+    if (typeof secret === 'string' && secret.length >= 4) text = text.split(secret).join('[REDACTED]');
+  }
+  return text;
 }
 
-function providerEnvelopeSummary(payload) {
+function providerEnvelopeSummary(payload, { secrets = [] } = {}) {
   const result = payload?.result;
   const message = payload?.choices?.[0]?.message ?? result?.choices?.[0]?.message;
   const content = message?.content ?? result?.response ?? payload?.response;
@@ -187,7 +191,7 @@ function providerEnvelopeSummary(payload) {
       .map((error) => normalizeString(String(error?.code ?? ''), '', 80))
       .filter(Boolean),
     errorMessages: providerErrors
-      .map((error) => safeDiagnosticText(error?.message))
+      .map((error) => safeDiagnosticText(error?.message, secrets))
       .filter(Boolean),
   };
 }
@@ -308,7 +312,7 @@ export async function requestCloudflareAdvice({
       cause,
     });
   }
-  const providerSummary = providerEnvelopeSummary(payload);
+  const providerSummary = providerEnvelopeSummary(payload, { secrets: [apiToken] });
   if (!response.ok || payload?.success === false) {
     throw new RenderproveError(
       `Cloudflare Workers AI request failed with HTTP ${response.status}. Provider envelope: ${JSON.stringify(providerSummary)}.`,
