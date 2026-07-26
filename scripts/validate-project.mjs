@@ -24,6 +24,7 @@ const required = [
   'src/visual/png.mjs',
   'src/vision.mjs',
   'src/vision/request.mjs',
+  'src/vision/advice.mjs',
   'src/interaction.mjs',
   'src/version.mjs',
   'src/core/manifest.mjs',
@@ -43,6 +44,8 @@ const required = [
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
+  'schema/vision-advice-payload-v1.schema.json',
+  'schema/vision-advice-v1.schema.json',
   'schema/vision-request-v1.schema.json',
   'schema/visual-comparison-v1.schema.json',
   'scripts/validate-package.mjs',
@@ -66,6 +69,7 @@ const required = [
   'tests/advice-status.test.mjs',
   'tests/advice-thinking.test.mjs',
   'tests/visual-comparison.test.mjs',
+  'tests/vision-advice.test.mjs',
   'tests/vision-request.test.mjs',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',
@@ -79,6 +83,8 @@ for (const schema of [
   'interaction-plan-v1.schema.json',
   'manifest-v1.schema.json',
   'receipt-v1.schema.json',
+  'vision-advice-payload-v1.schema.json',
+  'vision-advice-v1.schema.json',
   'vision-request-v1.schema.json',
   'visual-comparison-v1.schema.json',
 ]) {
@@ -106,11 +112,20 @@ if (packageJson.exports?.['./visual'] !== './src/visual.mjs') {
 if (packageJson.exports?.['./vision'] !== './src/vision.mjs') {
   throw new Error('package must expose the sparse vision request API');
 }
+if (packageJson.exports?.['./vision/advice'] !== './src/vision/advice.mjs') {
+  throw new Error('package must expose the provider-free vision advice API');
+}
 if (packageJson.exports?.['./interaction'] !== './src/interaction.mjs') {
   throw new Error('package must expose the bounded interaction API');
 }
 if (packageJson.exports?.['./schema/advice-v1.schema.json'] !== './schema/advice-v1.schema.json') {
   throw new Error('package must expose the advice result schema');
+}
+if (packageJson.exports?.['./schema/vision-advice-payload-v1.schema.json'] !== './schema/vision-advice-payload-v1.schema.json') {
+  throw new Error('package must expose the private vision advice payload schema');
+}
+if (packageJson.exports?.['./schema/vision-advice-v1.schema.json'] !== './schema/vision-advice-v1.schema.json') {
+  throw new Error('package must expose the public vision advice schema');
 }
 if (packageJson.exports?.['./schema/vision-request-v1.schema.json'] !== './schema/vision-request-v1.schema.json') {
   throw new Error('package must expose the vision request schema');
