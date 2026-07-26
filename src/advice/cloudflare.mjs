@@ -246,6 +246,9 @@ function buildProviderRequest(bundle, generation, responseSchema) {
     seed: 17,
     max_completion_tokens: generation.maxCompletionTokens,
   };
+  if (generation.thinking === 'disabled') {
+    request.chat_template_kwargs = { enable_thinking: false };
+  }
   if (generation.responseMode === 'json-schema') {
     request.response_format = {
       type: 'json_schema',
