@@ -15,6 +15,7 @@ const required = [
   'src/advice.mjs',
   'src/advice/bundle.mjs',
   'src/advice/cloudflare.mjs',
+  'src/advice/generation.mjs',
   'src/advice/policy.mjs',
   'src/advice/service.mjs',
   'src/visual.mjs',
