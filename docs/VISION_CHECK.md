@@ -41,6 +41,30 @@ Receipt-v1 currently permits these fields for the matched screenshot case:
 
 Diagnostic messages, URLs, page titles, body text, runtime commands, working directories, logs, and artifact paths are excluded. Receipt-v1 lacks typed interaction/check results and console severity, so this slice reports case disposition and diagnostic counts. A later receipt schema can add named checks through a separate reviewed allowlist.
 
+## Accepted PNG profile
+
+The screenshot container must contain the standard eight-byte PNG signature and a bounded sequence of CRC-valid chunks. The decoder accepts:
+
+- one valid `IHDR` before image data;
+- 8-bit samples only;
+- compression method 0, filter method 0, and no interlace;
+- colour type 0 (greyscale), 2 (truecolour), 4 (greyscale with alpha), or 6 (truecolour with alpha);
+- one or more `IDAT` chunks followed by exactly one empty `IEND`;
+- ordinary ancillary chunks before `IEND`, which are discarded during deterministic RGBA re-encoding;
+- at most 4,096 chunks, with each declared chunk payload at most 8,000,000 bytes;
+- bounded non-image trailing bytes after `IEND`, which are discarded during canonicalisation.
+
+The container preflight validates chunk boundaries, four-letter ASCII chunk names, CRCs, chunk count, chunk length, and `IEND` handling before decompression.
+
+The command explicitly refuses:
+
+- APNG animation chunks `acTL`, `fcTL`, and `fdAT`;
+- missing, duplicate, non-empty, truncated, or CRC-invalid `IEND` chunks;
+- a second concatenated PNG;
+- JPEG, GIF87a, GIF89a, or RIFF/WebP signatures anywhere after `IEND`;
+- malformed, truncated, over-count, or oversized chunks;
+- palette-indexed colour type 3, `tRNS`, bit depths other than 8, interlacing, unknown critical chunks, and decompressed data outside the pixel bound.
+
 ## Bounds and refusal policy
 
 - source image: at most 8,000,000 bytes;
@@ -49,6 +73,8 @@ Diagnostic messages, URLs, page titles, body text, runtime commands, working dir
 - decoded pixels: at most 16,000,000;
 - receipt: at most 256,000 bytes;
 - URLs, stdin, directories, final-component symlinks, path escapes, multiple explicit values, malformed JSON, unsupported receipt schemas, unmatched receipt screenshots, and repository include options are refused.
+
+Public input identities use `project://` followed by one or more project-relative path segments. Empty identities, absolute forms, `.` or `..` segments, backslashes, and ASCII control characters are refused by the preview schema.
 
 ### Declared deviation: JPEG
 
@@ -95,4 +121,4 @@ Private workspace roots stay private evidence. Public SmolRunner results should 
 
 ## Fixture and workflow coverage
 
-Required CI stays credentialless and network-free. `tests/vision-request.test.mjs` creates tiny deterministic images and receipts in temporary directories and covers canonical encoding, metadata/trailing-data removal, privacy, ordering, limits, path containment, symlinks, image bombs, malformed inputs, receipt matching, prompt-injection strings, stable digests, and CLI refusal of repository includes. A later live-provider test should remain manual or secret-gated.
+Required CI stays credentialless and network-free. `tests/vision-request.test.mjs` covers the packet and CLI baseline. `tests/vision-request-adversarial.test.mjs` adds a deterministic raster fixture with prompt-injection text drawn into pixels, PNG-container refusal cases, request-digest sensitivity and excluded-field invariance, preview-schema validation, and strict public `project://` identity cases. A later live-provider test should remain manual or secret-gated.
