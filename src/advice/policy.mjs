@@ -255,7 +255,10 @@ function globToRegExp(pattern) {
 
 export function matchesAdviceExclude(filePath, patterns) {
   const normalized = filePath.replaceAll('\\', '/').replace(/^\.\//, '');
-  return patterns.some((pattern) => globToRegExp(pattern).test(normalized));
+  return patterns.some((pattern) => {
+    if (pattern.startsWith('**/') && normalized === pattern.slice(3)) return true;
+    return globToRegExp(pattern).test(normalized);
+  });
 }
 
 function policyEvidence(policy, { model, maxCompletionTokens }) {
