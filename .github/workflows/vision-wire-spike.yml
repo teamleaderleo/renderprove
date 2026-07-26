@@ -4,9 +4,12 @@ on:
   push:
     branches:
       - docs/issue-29-cloudflare-vision-findings
+    paths:
+      - .github/workflows/vision-wire-spike.yml
+      - scripts/vision-wire-spike.mjs
 
 permissions:
-  contents: read
+  contents: write
   issues: write
 
 env:
@@ -44,6 +47,14 @@ jobs:
             privateDataRecorded: value.privateDataRecorded,
           }));
           NODE
+      - name: Record bounded metadata on branch
+        run: |
+          cp test-results/vision-wire-spike.json docs/cloudflare-vision-wire-spike-empirical.json
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add docs/cloudflare-vision-wire-spike-empirical.json
+          git commit -m "Record bounded Cloudflare vision spike metadata"
+          git push
       - name: Post bounded findings to issue 32
         env:
           GITHUB_TOKEN: ${{ github.token }}
