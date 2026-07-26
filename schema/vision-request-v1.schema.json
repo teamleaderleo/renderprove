@@ -1,0 +1,418 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/vision-request-v1.schema.json",
+  "title": "Renderprove vision request v1 privacy preview",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "mode",
+    "authority",
+    "commandContractId",
+    "commandContractDigest",
+    "promptPolicyVersion",
+    "canonicalizationProfile",
+    "requestDigest",
+    "inputs",
+    "receiptSummary",
+    "includedFactNames",
+    "exclusions",
+    "promptSafety",
+    "limits"
+  ],
+  "properties": {
+    "$schema": {
+      "const": "https://raw.githubusercontent.com/teamleaderleo/renderprove/main/schema/vision-request-v1.schema.json"
+    },
+    "schemaVersion": {
+      "const": "vision-request-v1"
+    },
+    "mode": {
+      "const": "dry-run"
+    },
+    "authority": {
+      "const": "advisory"
+    },
+    "commandContractId": {
+      "const": "renderprove.vision-check.v1"
+    },
+    "commandContractDigest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "promptPolicyVersion": {
+      "const": "vision-prompt-policy-v1"
+    },
+    "canonicalizationProfile": {
+      "const": "rgba8-png-zlib9-v1"
+    },
+    "requestDigest": {
+      "$ref": "#/$defs/sha256"
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "screenshot",
+        "brief",
+        "receipt"
+      ],
+      "properties": {
+        "screenshot": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "sourceMediaType",
+            "sourceBytes",
+            "sourceSha256",
+            "canonicalMediaType",
+            "canonicalBytes",
+            "canonicalSha256",
+            "width",
+            "height",
+            "pixels"
+          ],
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/projectPath"
+            },
+            "sourceMediaType": {
+              "const": "image/png"
+            },
+            "sourceBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8000000
+            },
+            "sourceSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "canonicalMediaType": {
+              "const": "image/png"
+            },
+            "canonicalBytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 8000000
+            },
+            "canonicalSha256": {
+              "$ref": "#/$defs/sha256"
+            },
+            "width": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "height": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 4096
+            },
+            "pixels": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16000000
+            }
+          }
+        },
+        "brief": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "path",
+            "bytes",
+            "words",
+            "sha256"
+          ],
+          "properties": {
+            "path": {
+              "$ref": "#/$defs/projectPath"
+            },
+            "bytes": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 2400
+            },
+            "words": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 300
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "receipt": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "path",
+                "bytes",
+                "sha256",
+                "schemaVersion"
+              ],
+              "properties": {
+                "path": {
+                  "$ref": "#/$defs/projectPath"
+                },
+                "bytes": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 256000
+                },
+                "sha256": {
+                  "$ref": "#/$defs/sha256"
+                },
+                "schemaVersion": {
+                  "const": 1
+                }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "receiptSummary": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "receiptDisposition",
+            "assertionDisposition",
+            "route",
+            "viewport",
+            "navigation",
+            "diagnostics"
+          ],
+          "properties": {
+            "receiptDisposition": {
+              "$ref": "#/$defs/disposition"
+            },
+            "assertionDisposition": {
+              "$ref": "#/$defs/disposition"
+            },
+            "route": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "path"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+                },
+                "path": {
+                  "type": "string",
+                  "pattern": "^/[^\\u0000-\\u001F\\u007F?#]*$",
+                  "maxLength": 512
+                }
+              }
+            },
+            "viewport": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "width",
+                "height",
+                "deviceScaleFactor"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128,
+                  "pattern": "^[^\\u0000-\\u001F\\u007F]+$"
+                },
+                "width": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                },
+                "height": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16384
+                },
+                "deviceScaleFactor": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                }
+              }
+            },
+            "navigation": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "ok",
+                "status"
+              ],
+              "properties": {
+                "ok": {
+                  "type": "boolean"
+                },
+                "status": {
+                  "type": [
+                    "integer",
+                    "null"
+                  ],
+                  "minimum": 100,
+                  "maximum": 599
+                }
+              }
+            },
+            "diagnostics": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "console",
+                "failedRequest",
+                "page",
+                "http",
+                "total"
+              ],
+              "properties": {
+                "console": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "failedRequest": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "page": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "http": {
+                  "type": "integer",
+                  "minimum": 0
+                },
+                "total": {
+                  "type": "integer",
+                  "minimum": 0
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "includedFactNames": {
+      "type": "array",
+      "uniqueItems": true,
+      "maxItems": 16,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9_]+$"
+      }
+    },
+    "exclusions": {
+      "type": "array",
+      "uniqueItems": true,
+      "minItems": 1,
+      "maxItems": 32,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9-]+$"
+      }
+    },
+    "promptSafety": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visiblePageText",
+        "briefText",
+        "browserDisposition"
+      ],
+      "properties": {
+        "visiblePageText": {
+          "const": "untrusted-evidence"
+        },
+        "briefText": {
+          "const": "bounded-operator-focus"
+        },
+        "browserDisposition": {
+          "const": "deterministic-authority"
+        }
+      }
+    },
+    "limits": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "maxBriefWords",
+        "maxBriefBytes",
+        "maxSourceImageBytes",
+        "maxCanonicalImageBytes",
+        "maxWidth",
+        "maxHeight",
+        "maxPixels",
+        "maxReceiptBytes",
+        "maxPngChunks"
+      ],
+      "properties": {
+        "maxBriefWords": {
+          "const": 300
+        },
+        "maxBriefBytes": {
+          "const": 2400
+        },
+        "maxSourceImageBytes": {
+          "const": 8000000
+        },
+        "maxCanonicalImageBytes": {
+          "const": 8000000
+        },
+        "maxWidth": {
+          "const": 4096
+        },
+        "maxHeight": {
+          "const": 4096
+        },
+        "maxPixels": {
+          "const": 16000000
+        },
+        "maxReceiptBytes": {
+          "const": 256000
+        },
+        "maxPngChunks": {
+          "const": 4096
+        }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "projectPath": {
+      "type": "string",
+      "pattern": "^project://(?:(?!\\.{1,2}(?:/|$))(?:[A-Za-z0-9._~-]|%(?!0[0-9A-F]|1[0-9A-F]|7F)[0-9A-F]{2})+)(?:/(?:(?!\\.{1,2}(?:/|$))(?:[A-Za-z0-9._~-]|%(?!0[0-9A-F]|1[0-9A-F]|7F)[0-9A-F]{2})+))*$",
+      "maxLength": 1024
+    },
+    "disposition": {
+      "enum": [
+        "passed",
+        "failed"
+      ]
+    }
+  }
+}

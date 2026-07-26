@@ -12,6 +12,7 @@
     ".": "./src/index.mjs",
     "./advice": "./src/advice.mjs",
     "./visual": "./src/visual.mjs",
+    "./vision": "./src/vision.mjs",
     "./interaction": "./src/interaction.mjs",
     "./manifest": "./src/core/manifest.mjs",
     "./receipt": "./src/core/receipt.mjs",
@@ -21,6 +22,7 @@
     "./schema/interaction-plan-v1.schema.json": "./schema/interaction-plan-v1.schema.json",
     "./schema/manifest-v1.schema.json": "./schema/manifest-v1.schema.json",
     "./schema/receipt-v1.schema.json": "./schema/receipt-v1.schema.json",
+    "./schema/vision-request-v1.schema.json": "./schema/vision-request-v1.schema.json",
     "./schema/visual-comparison-v1.schema.json": "./schema/visual-comparison-v1.schema.json"
   },
   "files": [
