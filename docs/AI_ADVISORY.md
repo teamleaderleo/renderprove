@@ -2,7 +2,7 @@
 
 Renderprove can send a bounded, sanitized set of project files and the latest browser receipt to Cloudflare Workers AI for a secondary review. The deterministic browser receipt remains authoritative. AI output is a separate `advice-v1` artifact and never changes browser pass/fail.
 
-The default model is `@cf/google/gemma-4-26b-a4b-it`. Renderprove uses Cloudflare's native `/ai/run/{model}` endpoint, low reasoning effort, and Node's built-in `fetch`; no provider SDK is required. Required function calling remains the default response mode. Projects may explicitly test Cloudflare's native JSON-schema response mode without changing the result artifact.
+The default model is `@cf/google/gemma-4-26b-a4b-it`. Renderprove uses Cloudflare's native `/ai/run/{model}` endpoint, low reasoning effort, and Node's built-in `fetch`; no provider SDK is required. Required function calling remains the default response mode. Projects may explicitly test Cloudflare's native JSON-schema response mode or disable model thinking without changing the result artifact.
 
 ## Quick start
 
@@ -62,6 +62,7 @@ Add `renderprove-advice.json` or `.renderprove-advice.json` to make the review f
   },
   "generation": {
     "responseMode": "tool",
+    "thinking": "enabled",
     "maxCompletionTokens": 3072,
     "maxFindings": 4,
     "maxEvidencePerFinding": 3,
@@ -99,20 +100,39 @@ Both modes use the same trusted questions, untrusted-evidence boundary, local no
 
 JSON-schema mode is opt-in because provider support varies by model and serving revision. Cloudflare's Gemma model schema currently exposes `response_format`, while Cloudflare's general JSON Mode model list may lag individual model capabilities. Treat a live project run as the compatibility proof. Provider rejection, invalid JSON, schema failure, or completion exhaustion remains `unavailable`; Renderprove never falls back silently to another mode or model.
 
+### Thinking control
+
+`generation.thinking` accepts `"enabled"` or `"disabled"` and defaults to enabled. Enabled mode preserves the provider's prior request behaviour and sends no model-specific chat-template option.
+
+Disabled mode sends exactly:
+
+```json
+{
+  "chat_template_kwargs": {
+    "enable_thinking": false
+  }
+}
+```
+
+This field comes from the authenticated live schema for `@cf/google/gemma-4-26b-a4b-it`, where thinking is enabled by default. Use disabled mode for narrowly scoped sanity checks when built-in reasoning consumes the completion reserve before producing an answer. Model schemas and serving behaviour can change, so keep the model pinned, retain status artifacts, and prove the setting in the target account. Renderprove does not invent alternate field names or silently retry with thinking changed.
+
+Thinking mode is part of the normalized policy, status, generated policy evidence, and bundle digest. Changing it forces a fresh provider call.
+
 ### Generation controls
 
 `generation` bounds both the provider output schema and local normalization:
 
 - `responseMode`: `tool` or `json-schema`;
+- `thinking`: `enabled` or `disabled`;
 - `maxCompletionTokens`: 1,024 through 4,096;
 - `maxFindings`: 1 through 10;
 - `maxEvidencePerFinding`: 1 through 8;
 - `maxStrengths`: 0 through 10;
 - `maxOmissions`: 0 through 10.
 
-Defaults are tool mode, 4,096 completion tokens, six findings, three evidence items per finding, four strengths, and four omissions. The completion ceiling is deliberately configurable because reasoning models may consume part of it before emitting the required output. Lower it only after a real project run proves the chosen scope still returns a complete result.
+Defaults are tool mode, thinking enabled, 4,096 completion tokens, six findings, three evidence items per finding, four strengths, and four omissions. The completion ceiling is deliberately configurable because reasoning models may consume part of it before emitting the required output. Lower it only after a real project run proves the chosen scope still returns a complete result.
 
-When Cloudflare returns `finish_reason: "length"` before a usable response, Renderprove classifies the run as `ADVICE_COMPLETION_EXHAUSTED`. The advisory remains unavailable, and `advice-status.json` retains only safe diagnostics: finish reason, tool-call count, content length, and provider token usage. It also retains the configured response mode, completion ceiling, and budget contact so an agent can ask the named operator before increasing the allowance. Generated text, credentials, and raw provider bodies remain excluded.
+When Cloudflare returns `finish_reason: "length"` before a usable response, Renderprove classifies the run as `ADVICE_COMPLETION_EXHAUSTED`. The advisory remains unavailable, and `advice-status.json` retains only safe diagnostics: finish reason, tool-call count, content length, and provider token usage. It also retains the configured response mode, thinking mode, completion ceiling, and budget contact so an agent can ask the named operator before increasing the allowance. Generated text, credentials, and raw provider bodies remain excluded.
 
 The exact questions and generation controls are included in the bundle digest. Changing either forces a new provider call rather than reusing stale advice.
 
@@ -173,7 +193,7 @@ The stored `advice.json` contains file paths, sizes, digests, redaction counts, 
 
 `advice-status.json` records whether the optional result is `available`, `skipped`, or `unavailable`, plus the bundle digest, budget estimate, normalized generation policy, and privacy-safe provider diagnostics when execution reaches the model but produces no usable result. It is operational status, not a replacement for the versioned advisory result.
 
-Generation uses temperature `0`, a fixed seed, low reasoning effort, the declared response mode, and the declared completion ceiling. Hosted model execution can still vary across requests, model revisions, and serving changes. Treat it as a sanity check, triage aid, or extra set of eyes.
+Generation uses temperature `0`, a fixed seed, low reasoning effort, the declared response mode, declared thinking mode, and the declared completion ceiling. Hosted model execution can still vary across requests, model revisions, and serving changes. Treat it as a sanity check, triage aid, or extra set of eyes.
 
 ## CI pattern
 

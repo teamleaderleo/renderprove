@@ -2,6 +2,7 @@ import { RenderproveError } from '../core/errors.mjs';
 
 export const DEFAULT_ADVICE_GENERATION = Object.freeze({
   responseMode: 'tool',
+  thinking: 'enabled',
   maxCompletionTokens: 4_096,
   maxFindings: 6,
   maxEvidencePerFinding: 3,
@@ -10,6 +11,7 @@ export const DEFAULT_ADVICE_GENERATION = Object.freeze({
 });
 
 const RESPONSE_MODES = Object.freeze(['tool', 'json-schema']);
+const THINKING_MODES = Object.freeze(['enabled', 'disabled']);
 const RANGES = Object.freeze({
   maxCompletionTokens: { min: 1_024, max: 4_096 },
   maxFindings: { min: 1, max: 10 },
@@ -25,7 +27,7 @@ export function normalizeAdviceGeneration(input = {}, {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
     throw new RenderproveError(`${label} must be an object.`, { code });
   }
-  const allowed = new Set(['responseMode', ...Object.keys(RANGES)]);
+  const allowed = new Set(['responseMode', 'thinking', ...Object.keys(RANGES)]);
   const unknown = Object.keys(input).filter((key) => !allowed.has(key));
   if (unknown.length > 0) {
     throw new RenderproveError(`${label} contains unknown fields: ${unknown.join(', ')}.`, {
@@ -37,7 +39,11 @@ export function normalizeAdviceGeneration(input = {}, {
   if (!RESPONSE_MODES.includes(responseMode)) {
     throw new RenderproveError(`${label}.responseMode must be tool or json-schema.`, { code });
   }
-  const normalized = { responseMode };
+  const thinking = input.thinking ?? DEFAULT_ADVICE_GENERATION.thinking;
+  if (!THINKING_MODES.includes(thinking)) {
+    throw new RenderproveError(`${label}.thinking must be enabled or disabled.`, { code });
+  }
+  const normalized = { responseMode, thinking };
   for (const [key, range] of Object.entries(RANGES)) {
     const value = input[key] ?? DEFAULT_ADVICE_GENERATION[key];
     if (!Number.isInteger(value) || value < range.min || value > range.max) {
