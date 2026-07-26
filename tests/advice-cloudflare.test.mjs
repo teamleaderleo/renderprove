@@ -37,7 +37,7 @@ test('parses fenced and structured advisory JSON while bounding fields', () => {
   assert.deepEqual(structured, structuredAdvice);
 });
 
-test('calls the native Workers AI endpoint with one forced advisory tool', async () => {
+test('calls the native Workers AI endpoint with the documented traditional tool request', async () => {
   const requests = [];
   const advice = await requestCloudflareAdvice({
     bundle,
@@ -64,13 +64,13 @@ test('calls the native Workers AI endpoint with one forced advisory tool', async
   assert.equal(requests[0].body.temperature, 0);
   assert.equal(requests[0].body.seed, 17);
   assert.equal(requests[0].body.max_completion_tokens, 4096);
-  assert.equal(requests[0].body.tool_choice, 'required');
-  assert.equal(requests[0].body.parallel_tool_calls, false);
   assert.deepEqual(requests[0].body.tools, [{
     name: 'report_advice',
     description: 'Return the final bounded, non-authoritative Renderprove advisory assessment.',
     parameters: ADVISORY_RESPONSE_SCHEMA,
   }]);
+  assert.equal('tool_choice' in requests[0].body, false);
+  assert.equal('parallel_tool_calls' in requests[0].body, false);
   assert.equal('model' in requests[0].body, false);
   assert.equal('response_format' in requests[0].body, false);
   assert.equal(advice.authoritative, false);
@@ -103,21 +103,27 @@ test('accepts OpenAI-compatible tool arguments as a compatibility fallback', asy
   assert.equal(advice.verdict, 'clear');
 });
 
-test('returns sanitized provider errors', async () => {
+test('returns useful provider validation errors with exact credentials redacted', async () => {
   await assert.rejects(() => requestCloudflareAdvice({
     bundle,
     accountId: 'account_123',
     apiToken: 'very-secret-api-token',
     fetchImpl: async () => new Response(JSON.stringify({
       success: false,
-      errors: [{ message: 'very-secret-api-token' }],
+      errors: [{
+        code: 1001,
+        message: 'invalid token very-secret-api-token; unsupported field tool_choice',
+      }],
     }), {
-      status: 200,
+      status: 400,
       headers: { 'content-type': 'application/json' },
     }),
   }), (error) => {
-    assert.equal(error.code, 'CLOUDFLARE_API_ERROR');
+    assert.equal(error.code, 'CLOUDFLARE_HTTP_400');
+    assert.match(error.message, /unsupported field tool_choice/);
     assert.doesNotMatch(error.message, /very-secret-api-token/);
+    assert.deepEqual(error.details.errorCodes, ['1001']);
+    assert.match(error.details.errorMessages[0], /\[REDACTED\]/);
     assert.doesNotMatch(JSON.stringify(error.details), /very-secret-api-token/);
     return true;
   });
