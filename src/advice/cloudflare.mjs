@@ -4,6 +4,7 @@ import { summarizeAdviceBundle } from './bundle.mjs';
 export const DEFAULT_CLOUDFLARE_MODEL = '@cf/google/gemma-4-26b-a4b-it';
 const DEFAULT_TIMEOUT_MS = 60_000;
 const MAX_COMPLETION_TOKENS = 4_096;
+const REASONING_EFFORT = 'low';
 const ADVICE_TOOL_NAME = 'report_advice';
 
 export const ADVISORY_RESPONSE_SCHEMA = Object.freeze({
@@ -289,6 +290,9 @@ export async function requestCloudflareAdvice({
               parameters: ADVISORY_RESPONSE_SCHEMA,
             },
           }],
+          tool_choice: 'required',
+          parallel_tool_calls: false,
+          reasoning_effort: REASONING_EFFORT,
           temperature: 0,
           seed: 17,
           max_completion_tokens: MAX_COMPLETION_TOKENS,
@@ -352,6 +356,7 @@ export async function requestCloudflareAdvice({
       temperature: 0,
       seed: 17,
       maxCompletionTokens: MAX_COMPLETION_TOKENS,
+      reasoningEffort: REASONING_EFFORT,
     },
   });
 }

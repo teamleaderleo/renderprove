@@ -37,7 +37,7 @@ test('parses fenced and structured advisory JSON while bounding fields', () => {
   assert.deepEqual(structured, structuredAdvice);
 });
 
-test('calls the native Workers AI endpoint with the provider-required function envelope', async () => {
+test('calls the native Workers AI endpoint with bounded reasoning and required tool use', async () => {
   const requests = [];
   const advice = await requestCloudflareAdvice({
     bundle,
@@ -70,6 +70,9 @@ test('calls the native Workers AI endpoint with the provider-required function e
   assert.equal(requests[0].body.temperature, 0);
   assert.equal(requests[0].body.seed, 17);
   assert.equal(requests[0].body.max_completion_tokens, 4096);
+  assert.equal(requests[0].body.reasoning_effort, 'low');
+  assert.equal(requests[0].body.tool_choice, 'required');
+  assert.equal(requests[0].body.parallel_tool_calls, false);
   assert.deepEqual(requests[0].body.tools, [{
     type: 'function',
     function: {
@@ -78,8 +81,6 @@ test('calls the native Workers AI endpoint with the provider-required function e
       parameters: ADVISORY_RESPONSE_SCHEMA,
     },
   }]);
-  assert.equal('tool_choice' in requests[0].body, false);
-  assert.equal('parallel_tool_calls' in requests[0].body, false);
   assert.equal('model' in requests[0].body, false);
   assert.equal('response_format' in requests[0].body, false);
   assert.equal(advice.authoritative, false);
@@ -87,7 +88,12 @@ test('calls the native Workers AI endpoint with the provider-required function e
   assert.deepEqual(advice.usage, { prompt_tokens: 100, completion_tokens: 20, total_tokens: 120 });
   assert.doesNotMatch(JSON.stringify(advice), /very-secret-api-token/);
   assert.equal(advice.input.files[0].content, undefined);
-  assert.equal(advice.generation.maxCompletionTokens, 4096);
+  assert.deepEqual(advice.generation, {
+    temperature: 0,
+    seed: 17,
+    maxCompletionTokens: 4096,
+    reasoningEffort: 'low',
+  });
   assert.equal(advice.providerRequestId, 'request-ray');
 });
 

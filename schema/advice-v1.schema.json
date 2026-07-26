@@ -69,11 +69,12 @@
     "generation": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["temperature", "seed", "maxCompletionTokens"],
+      "required": ["temperature", "seed", "maxCompletionTokens", "reasoningEffort"],
       "properties": {
         "temperature": { "const": 0 },
         "seed": { "type": "integer" },
-        "maxCompletionTokens": { "type": "integer", "minimum": 1 }
+        "maxCompletionTokens": { "type": "integer", "minimum": 1 },
+        "reasoningEffort": { "const": "low" }
       }
     }
   },
