@@ -26,6 +26,8 @@ const required = [
   'src/visual/comparison.mjs',
   'src/visual/delta-e.mjs',
   'src/visual/png.mjs',
+  'src/vision.mjs',
+  'src/vision/request.mjs',
   'src/interaction.mjs',
   'src/version.mjs',
   'src/browser/interaction-plan.mjs',
@@ -37,6 +39,7 @@ const required = [
   'schema/interaction-plan-v1.schema.json',
   'schema/manifest-v1.schema.json',
   'schema/receipt-v1.schema.json',
+  'schema/vision-request-v1.schema.json',
   'schema/visual-comparison-v1.schema.json',
   'build/worker/Containerfile',
   'scripts/probe-paths.mjs',
@@ -50,6 +53,7 @@ const required = [
   'docs/MCP.md',
   'docs/RECEIPT_V1.md',
   'docs/SELF_HOSTED_PROBE.md',
+  'docs/VISION_CHECK.md',
   'docs/VISUAL_COMPARISON.md',
 ];
 for (const file of required) {
@@ -64,6 +68,7 @@ for (const privatePath of [
   'tests/advice-status.test.mjs',
   'tests/advice-thinking.test.mjs',
   'tests/visual-comparison.test.mjs',
+  'tests/vision-request.test.mjs',
   'tests/interaction-plan.test.mjs',
   'tests/interaction-coordinates.test.mjs',
   'tests/probe-enrollment.test.mjs',

@@ -4,6 +4,7 @@ import { adviseProject } from './advice/service.mjs';
 import { comparePngFiles, summarizeVisualComparison } from './visual/comparison.mjs';
 import { summarizeReceipt } from './core/receipt.mjs';
 import { RenderproveError } from './core/errors.mjs';
+import { buildVisionRequest, summarizeVisionPreview } from './vision/request.mjs';
 import { VERSION } from './version.mjs';
 
 function write(stream, value) {
@@ -11,7 +12,7 @@ function write(stream, value) {
 }
 
 function help() {
-  return `Renderprove ${VERSION}\n\nUsage:\n  renderprove inspect [project] [--manifest path] [--json]\n  renderprove review [project] [--manifest path] [--output path] [--headed] [--json]\n  renderprove compare <reference.png> <candidate.png> [--output path] [--max-p99-delta-e n] [--max-obvious-fraction n] [--max-alpha-error n] [--max-panel-edge n] [--json]\n  renderprove advise [project] [--manifest path] [--advice-config path] [--receipt path] [--include path] [--output path] [--model id] [--max-files n] [--max-bytes n] [--dry-run] [--json]\n  renderprove version\n\nRenderprove reads renderprove.json or .renderprove.json from the project directory. Advisory policy is read from renderprove-advice.json or .renderprove-advice.json when present.\n\nThe compare command writes deterministic CIE76 metrics, a full-resolution Delta-E heatmap, and a reference/candidate/difference triptych. It is separate from receipt v1.\n\nThe advise command is optional and non-authoritative. Live Cloudflare Workers AI calls require CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Use --dry-run to inspect the sanitized bundle, review questions, exclusions, and estimated Neuron use without network access.`;
+  return `Renderprove ${VERSION}\n\nUsage:\n  renderprove inspect [project] [--manifest path] [--json]\n  renderprove review [project] [--manifest path] [--output path] [--headed] [--json]\n  renderprove compare <reference.png> <candidate.png> [--output path] [--max-p99-delta-e n] [--max-obvious-fraction n] [--max-alpha-error n] [--max-panel-edge n] [--json]\n  renderprove advise [project] [--manifest path] [--advice-config path] [--receipt path] [--include path] [--output path] [--model id] [--max-files n] [--max-bytes n] [--dry-run] [--json]\n  renderprove vision-check [project] --screenshot path --brief path [--receipt path] --dry-run [--json]\n  renderprove version\n\nRenderprove reads renderprove.json or .renderprove.json from the project directory. Advisory policy is read from renderprove-advice.json or .renderprove-advice.json when present.\n\nThe compare command writes deterministic CIE76 metrics, a full-resolution Delta-E heatmap, and a reference/candidate/difference triptych. It is separate from receipt v1.\n\nThe advise command is optional and non-authoritative. Live Cloudflare Workers AI calls require CLOUDFLARE_ACCOUNT_ID and CLOUDFLARE_API_TOKEN. Use --dry-run to inspect the sanitized bundle, review questions, exclusions, and estimated Neuron use without network access.\n\nThe vision-check command is a separate sparse screenshot advisory contract. This slice requires --dry-run, accepts one explicit PNG and brief plus an optional matching receipt, and performs no provider call.`;
 }
 
 function parseInteger(value, option, { min, max }) {
@@ -51,7 +52,7 @@ export function parseArgs(argv) {
       options.includePaths ??= [];
       options.includePaths.push(value);
       index += 1;
-    } else if (['--manifest', '--advice-config', '--output', '--receipt', '--model'].includes(arg)) {
+    } else if (['--manifest', '--advice-config', '--output', '--receipt', '--model', '--screenshot', '--brief'].includes(arg)) {
       const value = argv[index + 1];
       if (!value) throw new RenderproveError(`${arg} requires a value.`, { code: 'INVALID_ARGUMENT' });
       const keys = {
@@ -60,8 +61,14 @@ export function parseArgs(argv) {
         '--output': 'output',
         '--receipt': 'receipt',
         '--model': 'model',
+        '--screenshot': 'screenshot',
+        '--brief': 'brief',
       };
-      options[keys[arg]] = value;
+      const key = keys[arg];
+      if (command === 'vision-check' && options[key] != null) {
+        throw new RenderproveError(`${arg} may be provided only once.`, { code: 'INVALID_ARGUMENT' });
+      }
+      options[key] = value;
       index += 1;
     } else if (['--max-files', '--max-bytes', '--max-file-bytes', '--timeout', '--max-alpha-error', '--max-panel-edge'].includes(arg)) {
       const value = argv[index + 1];
@@ -119,7 +126,7 @@ export async function runCli(argv, { stdout, stderr, cwd, env = process.env }) {
     if (options.command === 'compare') {
       const disallowed = [
         'headed', 'dryRun', 'includePaths', 'manifest', 'adviceConfig', 'receipt', 'model',
-        'maxFiles', 'maxBytes', 'maxFileBytes', 'timeoutMs',
+        'screenshot', 'brief', 'maxFiles', 'maxBytes', 'maxFileBytes', 'timeoutMs',
       ].filter((key) => options[key] != null && options[key] !== false);
       if (disallowed.length > 0) {
         throw new RenderproveError('Browser and advisory options are unavailable for visual comparison.', {
@@ -171,6 +178,36 @@ export async function runCli(argv, { stdout, stderr, cwd, env = process.env }) {
         write(stdout, `Receipt: ${path.relative(cwd, receiptPath)}`);
       }
       return receipt.status === 'passed' ? 0 : 1;
+    }
+    if (options.command === 'vision-check') {
+      const disallowed = [
+        'headed', 'includePaths', 'manifest', 'adviceConfig', 'output', 'model',
+        'maxFiles', 'maxBytes', 'maxFileBytes', 'timeoutMs', 'maxP99DeltaE',
+        'maxObviousFraction', 'maxAlphaError', 'maxPanelEdge',
+      ].filter((key) => options[key] != null && options[key] !== false);
+      if (disallowed.length > 0) {
+        throw new RenderproveError('vision-check accepts only one screenshot, one brief, an optional receipt, --dry-run, and --json.', {
+          code: 'INVALID_ARGUMENT',
+          details: { disallowed },
+        });
+      }
+      if (!options.dryRun) {
+        throw new RenderproveError('vision-check currently requires --dry-run; provider execution is outside this slice.', {
+          code: 'INVALID_ARGUMENT',
+        });
+      }
+      if (!options.screenshot || !options.brief) {
+        throw new RenderproveError('vision-check requires --screenshot and --brief.', { code: 'INVALID_ARGUMENT' });
+      }
+      const result = await buildVisionRequest({
+        projectRoot,
+        screenshotPath: options.screenshot,
+        briefPath: options.brief,
+        receiptPath: options.receipt,
+      });
+      if (options.json) write(stdout, JSON.stringify(result.preview, null, 2));
+      else write(stdout, summarizeVisionPreview(result.preview));
+      return 0;
     }
     if (options.command === 'advise') {
       if (options.headed) {
