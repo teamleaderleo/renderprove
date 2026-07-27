@@ -1,0 +1,423 @@
+name: Agent review repair
+
+on:
+  push:
+    branches:
+      - feat/issue-33-vision-advice-v1
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/issue-33-vision-advice-v1
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Apply reviewed repairs
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+
+          def replace_once(text, old, new, label):
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{label}: expected one match, found {count}")
+              return text.replace(old, new, 1)
+
+          source_path = Path('src/vision/advice.mjs')
+          source = source_path.read_text()
+
+          source = replace_once(
+              source,
+              """function normalizeHttpStatus(value) {
+  if (value === null) return null;
+  return normalizeInteger(value, { label: 'operational.httpStatus', minimum: 100, maximum: 599 });
+}
+""",
+              """function normalizeHttpStatus(value) {
+  if (value === null) return null;
+  return normalizeInteger(value, { label: 'operational.httpStatus', minimum: 100, maximum: 599 });
+}
+
+function validateOperationalTuple({ status, httpStatus, providerCode, diagnostic }) {
+  if (diagnostic !== OPERATIONAL_DIAGNOSTICS[status]) {
+    fail('Operational diagnostic does not match the status policy.');
+  }
+  const isHttp = (minimum, maximum) => Number.isInteger(httpStatus)
+    && httpStatus >= minimum && httpStatus <= maximum;
+  let valid = false;
+  switch (status) {
+    case 'ok':
+      valid = providerCode === null && (httpStatus === null || isHttp(200, 299));
+      break;
+    case 'auth-error':
+      valid = providerCode === 'HTTP_401' && httpStatus === 401;
+      break;
+    case 'permission-error':
+      valid = providerCode === 'HTTP_403' && httpStatus === 403;
+      break;
+    case 'invalid-request':
+      valid = (providerCode === 'HTTP_413' && httpStatus === 413)
+        || (providerCode === 'HTTP_4XX' && isHttp(400, 499)
+          && ![401, 403, 408, 413, 429].includes(httpStatus));
+      break;
+    case 'timeout':
+      valid = (providerCode === 'HTTP_408' && httpStatus === 408)
+        || providerCode === 'DEADLINE_EXCEEDED';
+      break;
+    case 'rate-limited':
+      valid = providerCode === 'HTTP_429' && httpStatus === 429;
+      break;
+    case 'unavailable':
+      valid = (providerCode === 'HTTP_5XX' && isHttp(500, 599))
+        || providerCode === 'CLOUDFLARE_FAILURE';
+      break;
+    case 'transport-error':
+      valid = providerCode === 'TRANSPORT_FAILURE' && httpStatus === null;
+      break;
+    case 'response-too-large':
+      valid = providerCode === 'RESPONSE_TOO_LARGE';
+      break;
+    case 'invalid-response':
+      valid = providerCode === 'INVALID_RESPONSE';
+      break;
+    case 'cancelled':
+      valid = providerCode === 'CALLER_CANCELLED' && httpStatus === null;
+      break;
+    default:
+      valid = false;
+  }
+  if (!valid) fail('Operational metadata does not match the status policy.');
+}
+""",
+              'insert operational tuple policy',
+          )
+
+          source = replace_once(
+              source,
+              """  if (status === 'ok' && (providerCode !== null || diagnostic !== null)) {
+    fail('Successful operational status must omit providerCode and diagnostic.');
+  }
+  return deepFreeze({
+    status,
+    httpStatus: normalizeHttpStatus(object.httpStatus),
+    providerCode,
+    retryable: object.retryable,
+    diagnostic,
+  });
+""",
+              """  const httpStatus = normalizeHttpStatus(object.httpStatus);
+  validateOperationalTuple({ status, httpStatus, providerCode, diagnostic });
+  return deepFreeze({
+    status,
+    httpStatus,
+    providerCode,
+    retryable: object.retryable,
+    diagnostic,
+  });
+""",
+              'bind operational tuple',
+          )
+
+          source = replace_once(
+              source,
+              """  if (body && typeof body.getReader === 'function') {
+    const reader = body.getReader();
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        yield value;
+      }
+    } finally {
+      reader.releaseLock?.();
+    }
+    return;
+  }
+""",
+              """  if (body && typeof body.getReader === 'function') {
+    const reader = body.getReader();
+    let completed = false;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          completed = true;
+          break;
+        }
+        yield value;
+      }
+    } finally {
+      if (!completed) {
+        try {
+          await reader.cancel?.();
+        } catch {
+          // Preserve the original bounded-consumption failure.
+        }
+      }
+      reader.releaseLock?.();
+    }
+    return;
+  }
+""",
+              'cancel incomplete WHATWG stream',
+          )
+
+          source = replace_once(
+              source,
+              """    const object = {};
+""",
+              """    const object = Object.create(null);
+""",
+              'use null-prototype JSON object',
+          )
+
+          source = replace_once(
+              source,
+              """        fail(`${label} contains a duplicate JSON object key.`, 'INVALID_VISION_PROVIDER_RESPONSE', {
+          key,
+          path,
+        });
+""",
+              """        fail(`${label} contains a duplicate JSON object key.`, 'INVALID_VISION_PROVIDER_RESPONSE', {
+          reason: 'duplicate-object-key',
+        });
+""",
+              'remove provider-controlled duplicate details',
+          )
+
+          source = replace_once(
+              source,
+              """      object[key] = parseValue(`${path}.${key}`);
+""",
+              """      Object.defineProperty(object, key, {
+        value: parseValue(`${path}.${key}`),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+""",
+              'define parsed JSON data property',
+          )
+          source_path.write_text(source)
+
+          test_path = Path('tests/vision-advice.test.mjs')
+          tests = test_path.read_text()
+          tests = tests.replace(
+              "error.code === 'INVALID_VISION_PROVIDER_RESPONSE' && error.details.key === 'choices'",
+              "error.code === 'INVALID_VISION_PROVIDER_RESPONSE' && error.details.reason === 'duplicate-object-key'",
+          ).replace(
+              "error.code === 'INVALID_VISION_PROVIDER_RESPONSE' && error.details.key === 'assessment'",
+              "error.code === 'INVALID_VISION_PROVIDER_RESPONSE' && error.details.reason === 'duplicate-object-key'",
+          ).replace(
+              "error.code === 'INVALID_VISION_PROVIDER_RESPONSE' && error.details.key === 'risks'",
+              "error.code === 'INVALID_VISION_PROVIDER_RESPONSE' && error.details.reason === 'duplicate-object-key'",
+          )
+          tests += r'''
+
+test('rejects duplicate __proto__ keys at every untrusted JSON boundary', () => {
+  const assertDuplicate = (operation) => assert.throws(
+    operation,
+    (error) => error.code === 'INVALID_VISION_PROVIDER_RESPONSE'
+      && error.details.reason === 'duplicate-object-key'
+      && !JSON.stringify(error.details).includes('__proto__'),
+  );
+
+  assertDuplicate(() => parseCloudflareVisionAdviceResponse(
+    '{"__proto__":null,"__proto__":null,"choices":[]}',
+  ));
+
+  const duplicatePayload = JSON.stringify({
+    choices: [{
+      finish_reason: 'stop',
+      message: {
+        content: '{"__proto__":null,"__proto__":null,"assessment":"uncertain","observations":[{"text":"x","confidence":"low"}],"risks":[],"suggestedFollowUpChecks":[]}',
+      },
+    }],
+  });
+  assertDuplicate(() => parseCloudflareVisionAdviceResponse(duplicatePayload));
+
+  const duplicateArguments = '{"__proto__":null,"__proto__":null,"assessment":"uncertain","observations":[{"text":"x","confidence":"low"}],"risks":[],"suggestedFollowUpChecks":[]}';
+  assertDuplicate(() => parseCloudflareVisionAdviceResponse(
+    functionEnvelope({ calls: [visionCall(duplicateArguments)] }),
+    { outputMode: 'function' },
+  ));
+});
+
+test('rejects contradictory operational status tuples in runtime and schema validation', async () => {
+  const contradictory = {
+    status: 'auth-error',
+    httpStatus: 429,
+    providerCode: 'HTTP_429',
+    retryable: false,
+    diagnostic: 'Provider rate limit reached.',
+  };
+  assert.throws(
+    () => buildVisionAdviceDocument({
+      requestDigest: digest,
+      operational: contradictory,
+      provider,
+      timing,
+      usage: null,
+      advice: null,
+    }),
+    (error) => error.code === 'INVALID_VISION_ADVICE' && /status policy/u.test(error.message),
+  );
+
+  const publicSchema = JSON.parse(await fs.readFile(
+    new URL('../schema/vision-advice-v1.schema.json', import.meta.url),
+    'utf8',
+  ));
+  const invalidDocument = {
+    $schema: VISION_ADVICE_SCHEMA,
+    schemaVersion: 'vision-advice-v1',
+    authority: 'advisory',
+    requestDigest: digest,
+    operational: contradictory,
+    provider,
+    timing,
+    usage: null,
+    advice: null,
+  };
+  assert.notDeepEqual(schemaErrors(invalidDocument, publicSchema), []);
+});
+
+test('cancels an incomplete WHATWG response stream on bounded collector failure', async () => {
+  let reads = 0;
+  let cancellations = 0;
+  let releases = 0;
+  const source = {
+    body: {
+      getReader() {
+        return {
+          async read() {
+            reads += 1;
+            return { done: false, value: Buffer.from(reads === 1 ? '123' : '456') };
+          },
+          async cancel() {
+            cancellations += 1;
+          },
+          releaseLock() {
+            releases += 1;
+          },
+        };
+      },
+    },
+  };
+
+  await assert.rejects(
+    collectVisionResponseBytes(source, { maxBytes: 5 }),
+    (error) => error.code === 'VISION_PROVIDER_RESPONSE_TOO_LARGE',
+  );
+  assert.equal(reads, 2);
+  assert.equal(cancellations, 1);
+  assert.equal(releases, 1);
+});
+'''
+          test_path.write_text(tests)
+
+          schema_path = Path('schema/vision-advice-v1.schema.json')
+          schema = json.loads(schema_path.read_text())
+          diagnostics = {
+              'ok': None,
+              'auth-error': 'Provider authentication failed.',
+              'permission-error': 'Provider permission was denied.',
+              'invalid-request': 'Provider rejected the request.',
+              'timeout': 'Provider deadline was exceeded.',
+              'rate-limited': 'Provider rate limit reached.',
+              'unavailable': 'Provider service is unavailable.',
+              'transport-error': 'Provider transport failed.',
+              'response-too-large': 'Provider response exceeded the byte limit.',
+              'invalid-response': 'Provider response was invalid.',
+              'cancelled': 'Provider request was cancelled.',
+          }
+
+          def operational_shape(status, http_schema, code_schema):
+              return {
+                  'properties': {
+                      'operational': {
+                          'properties': {
+                              'status': {'const': status},
+                              'httpStatus': http_schema,
+                              'providerCode': code_schema,
+                              'retryable': {'const': status in {'timeout', 'rate-limited', 'unavailable', 'transport-error'}},
+                              'diagnostic': {'const': diagnostics[status]},
+                          },
+                          'required': ['status', 'httpStatus', 'providerCode', 'retryable', 'diagnostic'],
+                      },
+                  },
+                  'required': ['operational'],
+              }
+
+          rules = []
+          def add_rule(status, then):
+              rules.append({
+                  'if': {
+                      'properties': {'operational': {'properties': {'status': {'const': status}}, 'required': ['status']}},
+                      'required': ['operational'],
+                  },
+                  'then': then,
+              })
+
+          add_rule('ok', operational_shape('ok', {'oneOf': [{'type': 'null'}, {'type': 'integer', 'minimum': 200, 'maximum': 299}]}, {'type': 'null'}))
+          add_rule('auth-error', operational_shape('auth-error', {'const': 401}, {'const': 'HTTP_401'}))
+          add_rule('permission-error', operational_shape('permission-error', {'const': 403}, {'const': 'HTTP_403'}))
+          add_rule('invalid-request', {
+              'anyOf': [
+                  operational_shape('invalid-request', {'const': 413}, {'const': 'HTTP_413'}),
+                  operational_shape('invalid-request', {
+                      'type': 'integer', 'minimum': 400, 'maximum': 499,
+                      'not': {'enum': [401, 403, 408, 413, 429]},
+                  }, {'const': 'HTTP_4XX'}),
+              ],
+          })
+          add_rule('timeout', {
+              'anyOf': [
+                  operational_shape('timeout', {'const': 408}, {'const': 'HTTP_408'}),
+                  operational_shape('timeout', {'oneOf': [{'type': 'null'}, {'type': 'integer', 'minimum': 100, 'maximum': 599}]}, {'const': 'DEADLINE_EXCEEDED'}),
+              ],
+          })
+          add_rule('rate-limited', operational_shape('rate-limited', {'const': 429}, {'const': 'HTTP_429'}))
+          add_rule('unavailable', {
+              'anyOf': [
+                  operational_shape('unavailable', {'type': 'integer', 'minimum': 500, 'maximum': 599}, {'const': 'HTTP_5XX'}),
+                  operational_shape('unavailable', {'oneOf': [{'type': 'null'}, {'type': 'integer', 'minimum': 100, 'maximum': 599}]}, {'const': 'CLOUDFLARE_FAILURE'}),
+              ],
+          })
+          add_rule('transport-error', operational_shape('transport-error', {'type': 'null'}, {'const': 'TRANSPORT_FAILURE'}))
+          add_rule('response-too-large', operational_shape('response-too-large', {'oneOf': [{'type': 'null'}, {'type': 'integer', 'minimum': 100, 'maximum': 599}]}, {'const': 'RESPONSE_TOO_LARGE'}))
+          add_rule('invalid-response', operational_shape('invalid-response', {'oneOf': [{'type': 'null'}, {'type': 'integer', 'minimum': 100, 'maximum': 599}]}, {'const': 'INVALID_RESPONSE'}))
+          add_rule('cancelled', operational_shape('cancelled', {'type': 'null'}, {'const': 'CALLER_CANCELLED'}))
+          schema['allOf'].extend(rules)
+          schema_path.write_text(json.dumps(schema, indent=2) + '\n')
+          PY
+
+      - name: Run focused validation
+        run: |
+          node --check src/vision/advice.mjs
+          node --check tests/vision-advice.test.mjs
+          node --test tests/vision-advice.test.mjs
+
+      - name: Commit reviewed repairs
+        shell: bash
+        run: |
+          rm .github/workflows/agent-review-repair.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add src/vision/advice.mjs tests/vision-advice.test.mjs schema/vision-advice-v1.schema.json .github/workflows/agent-review-repair.yml
+          git commit -m "fix: close vision advice review findings"
+          git push origin HEAD:feat/issue-33-vision-advice-v1
