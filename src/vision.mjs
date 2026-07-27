@@ -11,3 +11,23 @@ export {
   VISION_REQUEST_VERSION,
   VISION_SYSTEM_PROMPT,
 } from './vision/request.mjs';
+
+export {
+  buildVisionAdviceDocument,
+  buildVisionOperationalStatus,
+  collectVisionResponseBytes,
+  mapVisionOperationalFailure,
+  normalizeVisionAdvicePayload,
+  normalizeVisionUsage,
+  parseCloudflareVisionAdviceResponse,
+  parseCloudflareVisionAdviceStream,
+  VISION_ADVICE_AUTHORITY,
+  VISION_ADVICE_LIMITS,
+  VISION_ADVICE_PAYLOAD_SCHEMA,
+  VISION_ADVICE_PAYLOAD_VERSION,
+  VISION_ADVICE_SCHEMA,
+  VISION_ADVICE_SCHEMA_VERSION,
+  VISION_ADVICE_TOOL_NAME,
+  VISION_OPERATIONAL_STATUSES,
+  VISION_PROVIDER_CODES,
+} from './vision/advice.mjs';
