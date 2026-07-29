@@ -10,7 +10,7 @@ jobs:
   biome-trial:
     if: github.head_ref == 'fieldwork/biome/issue-27'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v6
@@ -50,6 +50,10 @@ jobs:
             echo unstable > fieldwork-results/format-idempotence.txt
             diff -u fieldwork-results/format-first.patch fieldwork-results/format-second.patch > fieldwork-results/format-idempotence.diff || true
           fi
+          set +e
+          npm test > fieldwork-results/post-format-test.txt 2>&1
+          echo $? > fieldwork-results/post-format-test.status
+          set -e
 
           git reset --hard HEAD
           set +e
@@ -59,13 +63,72 @@ jobs:
           git diff -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/safe-fix.patch
           git diff --stat -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/safe-fix.stat
           git diff --name-only -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/safe-fix.files
-
           set +e
           npm run check > fieldwork-results/post-fix-check.txt 2>&1
           echo $? > fieldwork-results/post-fix-check.status
           npm test > fieldwork-results/post-fix-test.txt 2>&1
           echo $? > fieldwork-results/post-fix-test.status
           set -e
+
+          git reset --hard HEAD
+          set +e
+          npx -y @biomejs/biome@2.5.6 check . --write --formatter-enabled=false --linter-enabled=false --max-diagnostics=1000 > fieldwork-results/assist-only.txt 2>&1
+          echo $? > fieldwork-results/assist-only.status
+          set -e
+          git diff -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/assist-only.patch
+          set +e
+          npm test > fieldwork-results/post-assist-only-test.txt 2>&1
+          echo $? > fieldwork-results/post-assist-only-test.status
+          set -e
+
+          git reset --hard HEAD
+          set +e
+          npx -y @biomejs/biome@2.5.6 check . --write --assist-enabled=false --max-diagnostics=1000 > fieldwork-results/no-assist.txt 2>&1
+          echo $? > fieldwork-results/no-assist.status
+          set -e
+          git diff -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/no-assist.patch
+          set +e
+          npm test > fieldwork-results/post-no-assist-test.txt 2>&1
+          echo $? > fieldwork-results/post-no-assist-test.status
+          set -e
+
+          rm -rf /tmp/biome-export-order-27
+          mkdir -p /tmp/biome-export-order-27
+          cat > /tmp/biome-export-order-27/package.json <<'JSON'
+          { "type": "module" }
+          JSON
+          cat > /tmp/biome-export-order-27/star.mjs <<'JS'
+          globalThis.order ??= [];
+          globalThis.order.push("star");
+          export const star = 1;
+          JS
+          cat > /tmp/biome-export-order-27/named.mjs <<'JS'
+          globalThis.order ??= [];
+          globalThis.order.push("named");
+          export const named = 2;
+          JS
+          cat > /tmp/biome-export-order-27/index.mjs <<'JS'
+          export * from "./star.mjs";
+          export { named } from "./named.mjs";
+          JS
+          cat > /tmp/biome-export-order-27/consumer.mjs <<'JS'
+          import { named, star } from "./index.mjs";
+          console.log(`${star}:${named}:${globalThis.order.join(",")}`);
+          JS
+          cp /tmp/biome-export-order-27/index.mjs fieldwork-results/export-order.before.mjs
+          (cd /tmp/biome-export-order-27 && node consumer.mjs) > fieldwork-results/export-order.before.txt
+          set +e
+          npx -y @biomejs/biome@2.5.6 check /tmp/biome-export-order-27/index.mjs --write > fieldwork-results/export-order-biome.txt 2>&1
+          echo $? > fieldwork-results/export-order-biome.status
+          set -e
+          cp /tmp/biome-export-order-27/index.mjs fieldwork-results/export-order.after.mjs
+          (cd /tmp/biome-export-order-27 && node consumer.mjs) > fieldwork-results/export-order.after.txt
+          diff -u fieldwork-results/export-order.before.mjs fieldwork-results/export-order.after.mjs > fieldwork-results/export-order.patch || true
+          if cmp -s fieldwork-results/export-order.before.txt fieldwork-results/export-order.after.txt; then
+            echo preserved > fieldwork-results/export-order-semantics.txt
+          else
+            echo changed > fieldwork-results/export-order-semantics.txt
+          fi
 
           rm -rf /tmp/biome-config-27
           mkdir -p /tmp/biome-config-27/packages/example
@@ -78,13 +141,17 @@ jobs:
           cat > /tmp/biome-config-27/packages/example/sample.js <<'JS'
           export const values = ["alpha", "beta", "gamma", "delta", "epsilon"];
           JS
-          (cd /tmp/biome-config-27 && npx -y @biomejs/biome@2.5.6 format packages/example/sample.js) > fieldwork-results/config-root.out 2> fieldwork-results/config-root.err || true
-          (cd /tmp/biome-config-27/packages/example && npx -y @biomejs/biome@2.5.6 format sample.js) > fieldwork-results/config-nested.out 2> fieldwork-results/config-nested.err || true
-          if cmp -s fieldwork-results/config-root.out fieldwork-results/config-nested.out; then
+          cp /tmp/biome-config-27/packages/example/sample.js /tmp/biome-config-27/sample.original.js
+          (cd /tmp/biome-config-27 && npx -y @biomejs/biome@2.5.6 format packages/example/sample.js --write) > fieldwork-results/config-root.out 2> fieldwork-results/config-root.err || true
+          cp /tmp/biome-config-27/packages/example/sample.js fieldwork-results/config-root.formatted.js
+          cp /tmp/biome-config-27/sample.original.js /tmp/biome-config-27/packages/example/sample.js
+          (cd /tmp/biome-config-27/packages/example && npx -y @biomejs/biome@2.5.6 format sample.js --write) > fieldwork-results/config-nested.out 2> fieldwork-results/config-nested.err || true
+          cp /tmp/biome-config-27/packages/example/sample.js fieldwork-results/config-nested.formatted.js
+          if cmp -s fieldwork-results/config-root.formatted.js fieldwork-results/config-nested.formatted.js; then
             echo consistent > fieldwork-results/config-discovery.txt
           else
             echo divergent > fieldwork-results/config-discovery.txt
-            diff -u fieldwork-results/config-root.out fieldwork-results/config-nested.out > fieldwork-results/config-discovery.diff || true
+            diff -u fieldwork-results/config-root.formatted.js fieldwork-results/config-nested.formatted.js > fieldwork-results/config-discovery.diff || true
           fi
 
           printf '\n=== summary ===\n'
@@ -93,12 +160,19 @@ jobs:
           printf 'format-first='; cat fieldwork-results/format-first.status
           printf 'format-second='; cat fieldwork-results/format-second.status
           printf 'idempotence='; cat fieldwork-results/format-idempotence.txt
+          printf 'post-format-test='; cat fieldwork-results/post-format-test.status
           printf 'safe-fix='; cat fieldwork-results/safe-fix.status
           printf 'post-fix-check='; cat fieldwork-results/post-fix-check.status
           printf 'post-fix-test='; cat fieldwork-results/post-fix-test.status
+          printf 'assist-only='; cat fieldwork-results/assist-only.status
+          printf 'post-assist-only-test='; cat fieldwork-results/post-assist-only-test.status
+          printf 'no-assist='; cat fieldwork-results/no-assist.status
+          printf 'post-no-assist-test='; cat fieldwork-results/post-no-assist-test.status
+          printf 'export-order-biome='; cat fieldwork-results/export-order-biome.status
+          printf 'export-order-semantics='; cat fieldwork-results/export-order-semantics.txt
           printf 'config-discovery='; cat fieldwork-results/config-discovery.txt
-          cat fieldwork-results/format-first.stat
-          cat fieldwork-results/safe-fix.stat
+          cat fieldwork-results/export-order.before.txt
+          cat fieldwork-results/export-order.after.txt
       - name: Upload trial evidence
         if: always()
         uses: actions/upload-artifact@v4
