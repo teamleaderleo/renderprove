@@ -1,0 +1,109 @@
+name: Fieldwork Biome issue 27
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  biome-trial:
+    if: github.head_ref == 'fieldwork/biome/issue-27'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+      - name: Install project dependencies
+        run: npm ci --ignore-scripts
+      - name: Exercise Biome
+        shell: bash
+        run: |
+          set -u
+          mkdir -p fieldwork-results
+          printf 'repository=teamleaderleo/renderprove\nrevision=%s\n' "$(git rev-parse HEAD)" > fieldwork-results/metadata.txt
+          npx -y @biomejs/biome@2.5.6 --version 2>&1 | tee fieldwork-results/biome-version.txt
+
+          set +e
+          npx -y @biomejs/biome@2.5.6 check . --max-diagnostics=1000 > fieldwork-results/check.txt 2>&1
+          echo $? > fieldwork-results/check.status
+          set -e
+
+          git reset --hard HEAD
+          set +e
+          npx -y @biomejs/biome@2.5.6 format . --write > fieldwork-results/format-first.txt 2>&1
+          echo $? > fieldwork-results/format-first.status
+          set -e
+          git diff -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/format-first.patch
+          git diff --stat -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/format-first.stat
+          git diff --name-only -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/format-first.files
+          set +e
+          npx -y @biomejs/biome@2.5.6 format . --write > fieldwork-results/format-second.txt 2>&1
+          echo $? > fieldwork-results/format-second.status
+          set -e
+          git diff -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/format-second.patch
+          if cmp -s fieldwork-results/format-first.patch fieldwork-results/format-second.patch; then
+            echo stable > fieldwork-results/format-idempotence.txt
+          else
+            echo unstable > fieldwork-results/format-idempotence.txt
+            diff -u fieldwork-results/format-first.patch fieldwork-results/format-second.patch > fieldwork-results/format-idempotence.diff || true
+          fi
+
+          git reset --hard HEAD
+          set +e
+          npx -y @biomejs/biome@2.5.6 check . --write --max-diagnostics=1000 > fieldwork-results/safe-fix.txt 2>&1
+          echo $? > fieldwork-results/safe-fix.status
+          set -e
+          git diff -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/safe-fix.patch
+          git diff --stat -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/safe-fix.stat
+          git diff --name-only -- . ':(exclude).github/workflows/fieldwork-biome-27.yml' > fieldwork-results/safe-fix.files
+
+          set +e
+          npm run check > fieldwork-results/post-fix-check.txt 2>&1
+          echo $? > fieldwork-results/post-fix-check.status
+          npm test > fieldwork-results/post-fix-test.txt 2>&1
+          echo $? > fieldwork-results/post-fix-test.status
+          set -e
+
+          rm -rf /tmp/biome-config-27
+          mkdir -p /tmp/biome-config-27/packages/example
+          cat > /tmp/biome-config-27/biome.json <<'JSON'
+          {
+            "formatter": { "enabled": true, "lineWidth": 40 },
+            "linter": { "enabled": false }
+          }
+          JSON
+          cat > /tmp/biome-config-27/packages/example/sample.js <<'JS'
+          export const values = ["alpha", "beta", "gamma", "delta", "epsilon"];
+          JS
+          (cd /tmp/biome-config-27 && npx -y @biomejs/biome@2.5.6 format packages/example/sample.js) > fieldwork-results/config-root.out 2> fieldwork-results/config-root.err || true
+          (cd /tmp/biome-config-27/packages/example && npx -y @biomejs/biome@2.5.6 format sample.js) > fieldwork-results/config-nested.out 2> fieldwork-results/config-nested.err || true
+          if cmp -s fieldwork-results/config-root.out fieldwork-results/config-nested.out; then
+            echo consistent > fieldwork-results/config-discovery.txt
+          else
+            echo divergent > fieldwork-results/config-discovery.txt
+            diff -u fieldwork-results/config-root.out fieldwork-results/config-nested.out > fieldwork-results/config-discovery.diff || true
+          fi
+
+          printf '\n=== summary ===\n'
+          cat fieldwork-results/biome-version.txt
+          printf 'check='; cat fieldwork-results/check.status
+          printf 'format-first='; cat fieldwork-results/format-first.status
+          printf 'format-second='; cat fieldwork-results/format-second.status
+          printf 'idempotence='; cat fieldwork-results/format-idempotence.txt
+          printf 'safe-fix='; cat fieldwork-results/safe-fix.status
+          printf 'post-fix-check='; cat fieldwork-results/post-fix-check.status
+          printf 'post-fix-test='; cat fieldwork-results/post-fix-test.status
+          printf 'config-discovery='; cat fieldwork-results/config-discovery.txt
+          cat fieldwork-results/format-first.stat
+          cat fieldwork-results/safe-fix.stat
+      - name: Upload trial evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fieldwork-biome-27-renderprove
+          path: fieldwork-results
+          if-no-files-found: error
+          retention-days: 7
