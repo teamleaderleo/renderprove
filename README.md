@@ -98,9 +98,28 @@ npx renderprove compare baseline.png candidate.png \
 
 The result exits with `0` when declared thresholds pass, `1` when the completed comparison fails, and `2` for input or execution failures. The artifact remains separate from receipt v1. See [deterministic visual comparison](docs/VISUAL_COMPARISON.md) for the metric boundary, panel digest, PNG limits, and planned FLIP upgrade.
 
+## Sparse screenshot vision contract
+
+Current main also contains the separate `vision-check` path for screenshot-oriented advisory evidence. It builds one bounded provider-neutral request from an explicit PNG, a short operator brief, and an optional matching Renderprove receipt:
+
+```bash
+renderprove vision-check \
+  --screenshot .renderprove/desktop/home.png \
+  --brief renderprove-vision-brief.txt \
+  --receipt .renderprove/receipt.json \
+  --dry-run \
+  --json
+```
+
+The command canonicalizes the image to a bounded metadata-free RGBA PNG, validates the optional receipt against the exact screenshot hash, emits a privacy-safe public preview, and binds the private packet to a deterministic request digest and fixed prompt/canonicalization identities. Screenshot text remains untrusted evidence; model output remains advisory and cannot revise deterministic browser disposition.
+
+The repository also exports strict provider-free `vision-advice-v1` normalization and schemas. That layer validates and normalizes an eventual vision-provider response locally with bounded fields and advisory authority. It performs no provider call by itself. This is already packaged/tested API surface rather than a future placeholder.
+
+See [sparse screenshot advisory contract](docs/VISION_CHECK.md) and the `vision-advice-v1` / `vision-advice-payload-v1` schemas under [`schema/`](schema/).
+
 ## Optional Gemma advisory
 
-Cloudflare Workers AI can provide a cheap secondary review over the latest receipt and a bounded set of project files:
+Cloudflare Workers AI can provide a cheap secondary source-oriented review over the latest receipt and a bounded set of project files:
 
 ```bash
 npx renderprove advise --dry-run
@@ -176,14 +195,16 @@ Included now:
 - repeated fresh-container screenshot convergence reports
 - standalone bounded interaction-plan validation and execution
 - deterministic standalone PNG comparison with exact and perceptual evidence
-- optional bounded Cloudflare Gemma advisory artifacts with project policy and cache reuse
-- locked core, package, executable, MCP, worker, interaction, advice, visual, and browser CI
+- provider-neutral bounded `vision-check` request construction and privacy preview
+- provider-free strict vision-advice normalization/schema API
+- optional bounded Cloudflare Gemma source advisory artifacts with project policy and cache reuse
+- locked core, package, executable, MCP, worker, interaction, advice, vision, visual, and browser CI
 
 Planned after this contract proves useful:
 
 - attach interaction results and captures to a new evidence contract
 - add baseline identity and visual-comparison references to receipt v2
-- add screenshot-aware checklist advisory evidence
+- connect the provider-neutral vision request/advice contracts to a reviewed live vision provider adapter
 - add FLIP as an explicitly versioned rendered-image metric
 - authenticated remote HTTP MCP
 - Stensibly artifact and work-item adapters
