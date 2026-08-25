@@ -5,7 +5,7 @@
 Renderprove owns project-aware inspection. It does not own durable coordination, general CI scheduling, production deployment, or arbitrary agent reasoning.
 
 - **Renderprove:** manifests, project startup, browser review, bounded interactions, evidence, receipts, bounded inspection tools, and optional bounded advisory bundles.
-- **SmolRunner:** trusted workers, bounded execution, leased workspaces and previews.
+- **Glaeda:** trusted workers, bounded execution, leased workspaces and previews.
 - **Stensibly:** requests, claims, handoffs, events, and artifact references.
 - **Playwright:** browser implementation behind Renderprove's narrower contract.
 - **Cloudflare Workers AI:** optional external model execution behind Renderprove's sanitized advisory contract.
@@ -45,7 +45,7 @@ The initial worker is single-operator and trusted-code only. Renderprove does no
 - Provider credentials and transmitted source content are excluded from the persisted advisory artifact.
 - Fork pull requests must not automatically reach personal self-hosted workers or provider credentials.
 
-The CLI's lexical path checks assume trusted repository contents. The local MCP adds operator-root and selected-project real-path checks, plus runtime and evidence-directory checks. A repository runtime can still execute arbitrary code; symlink-hostile or untrusted workspaces require a stronger sandbox boundary such as a SmolRunner-managed container.
+The CLI's lexical path checks assume trusted repository contents. The local MCP adds operator-root and selected-project real-path checks, plus runtime and evidence-directory checks. A repository runtime can still execute arbitrary code; symlink-hostile or untrusted workspaces require a stronger sandbox boundary such as a Glaeda-managed container.
 
 Secret filtering and prompt-injection instructions reduce common advisory risks without proving confidentiality or model compliance. Sensitive repositories need operator inspection of the dry-run bundle and a deliberate provider policy.
 
