@@ -5,7 +5,7 @@
 Renderprove starts a trusted local project or connects to an existing deployment, opens declared routes in Chromium, and writes a versioned receipt containing screenshots, hashes, page facts, navigation results, and browser diagnostics.
 
 ```text
-SmolRunner runs it.
+Glaeda runs it.
 Renderprove sees and verifies it.
 Stensibly records what happened.
 ```
@@ -45,7 +45,7 @@ npm run probe:repeatability
 
 The repeatability report records every worker fingerprint, receipt status, case set, and screenshot SHA-256 observation beneath `tests/fixtures/site/.renderprove-repeatability`. It exits with `1` when a receipt fails, the renderer identity changes, a case disappears, or screenshot bytes drift.
 
-The initial path is intended for the existing Lima Ubuntu lab VM. SmolRunner remains the eventual owner of runner lifecycle and disposable execution; Renderprove owns the browser review and receipt. See [self-hosted renderer probe](docs/SELF_HOSTED_PROBE.md).
+The initial path is intended for the existing Lima Ubuntu lab VM. Glaeda remains the eventual owner of runner lifecycle and disposable execution; Renderprove owns the browser review and receipt. See [self-hosted renderer probe](docs/SELF_HOSTED_PROBE.md).
 
 ## Local MCP
 
@@ -208,7 +208,7 @@ Planned after this contract proves useful:
 - add FLIP as an explicitly versioned rendered-image metric
 - authenticated remote HTTP MCP
 - Stensibly artifact and work-item adapters
-- SmolRunner leased-preview execution
+- Glaeda leased-preview execution
 - WebKit, Firefox, and native simulator workers
 
 ## Security
