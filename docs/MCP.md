@@ -91,4 +91,4 @@ The local server is for one trusted operator and trusted repository revisions.
 - stdout is reserved entirely for MCP JSON-RPC; operator errors use stderr.
 - Remote HTTP transport, authentication, shared tenancy, and arbitrary browser tools remain outside this release.
 
-A project can execute arbitrary code once its declared runtime starts. Filesystem path checks are defence in depth, not a substitute for a SmolRunner container or another worker sandbox when revisions are untrusted.
+A project can execute arbitrary code once its declared runtime starts. Filesystem path checks are defence in depth, not a substitute for a Glaeda container or another worker sandbox when revisions are untrusted.
