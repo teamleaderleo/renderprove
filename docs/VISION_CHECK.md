@@ -109,9 +109,9 @@ Sources:
 - https://developers.cloudflare.com/workers-ai/configuration/open-ai-compatibility/
 - https://developers.cloudflare.com/workers-ai/features/markdown-conversion/how-it-works/
 
-## SmolRunner handoff design
+## Glaeda handoff design
 
-The merged SmolRunner verification-profile contract provides the vocabulary needed for a later `renderprove.vision-check` profile:
+The merged Glaeda verification-profile contract provides the vocabulary needed for a later `renderprove.vision-check` profile:
 
 - profile ID: `renderprove.vision-check`;
 - repository command ID: `renderprove.vision-check.v1`;
@@ -129,7 +129,7 @@ The merged SmolRunner verification-profile contract provides the vocabulary need
 
 The command-contract digest must not vary with each screenshot. The request digest must vary when canonical pixels, the canonical brief, or allowlisted receipt facts vary. Changes limited to excluded receipt strings do not change the request digest.
 
-Private workspace roots stay private evidence. Public SmolRunner results should carry project-relative identities and hashes only. Executable adapter work belongs in the SmolRunner repository after the Renderprove argv and command-contract digest merge.
+Private workspace roots stay private evidence. Public Glaeda results should carry project-relative identities and hashes only. Executable adapter work belongs in the Glaeda repository after the Renderprove argv and command-contract digest merge.
 
 ## Fixture and workflow coverage
 
