@@ -1,6 +1,6 @@
 # Self-hosted renderer probe
 
-This probe runs Renderprove inside one disposable rootless Podman container in the existing Linux VM. It is an early proving path for trusted repository revisions, not a hostile-code sandbox or a replacement for SmolRunner.
+This probe runs Renderprove inside one disposable rootless Podman container in the existing Linux VM. It is an early proving path for trusted repository revisions, not a hostile-code sandbox or a replacement for Glaeda.
 
 ## Boundary
 
@@ -15,7 +15,7 @@ macOS
 
 The first slice keeps the reviewed app process and Chromium inside the same disposable container. Outbound networking is disabled. The app may use loopback only. The project directory is the sole writable bind mount, and the probe applies CPU, memory, PID, capability, and temporary-filesystem limits.
 
-SmolRunner remains responsible for the eventual GitHub runner lifecycle, disposable project execution, ownership, and cleanup policy. Renderprove remains responsible for the browser review and evidence contract.
+Glaeda remains responsible for the eventual GitHub runner lifecycle, disposable project execution, ownership, and cleanup policy. Renderprove remains responsible for the browser review and evidence contract.
 
 ## Prerequisites
 
@@ -26,7 +26,7 @@ Run this from a Linux checkout inside the Lima guest:
 - enough free disk to pull and build the pinned Playwright image
 - a trusted Renderprove checkout
 
-The existing `smolrunner` Lima profile is a suitable lab guest because it has no host mounts, port forwards, SSH-agent forwarding, or inherited proxy environment.
+The existing `smolrunner` Lima profile is a suitable lab guest because it has no host mounts, port forwards, SSH-agent forwarding, or inherited proxy environment. The profile name remains an exact pre-Glaeda runtime identity until that VM/profile is rebuilt or renamed.
 
 ## Run the fixture probe
 
@@ -144,6 +144,6 @@ Increasing the Lima guest to 8 GiB is recommended before reviewing a production 
 - no authentication injection;
 - no secret scanning or screenshot masking;
 - no automatic GitHub runner registration;
-- no SmolRunner mutation path.
+- no Glaeda mutation path.
 
 The next slices should bind exact worker provenance into receipt v2, enrol a separately prepared application, then add baseline and perceptual-difference evidence.
